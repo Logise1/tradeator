@@ -8,6 +8,19 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+    
+    <!-- === INICIO: CONFIGURACIÓN PWA AÑADIDA === -->
+    <!-- Web App Manifest para Android (Chrome) -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#111827"> 
+
+    <!-- Iconos y meta tags para iOS (Apple-specific meta tags) -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Tradeator">
+    <link rel="apple-touch-icon" href="https://weberia.neocities.org/stock.png">
+    <!-- === FIN: CONFIGURACIÓN PWA AÑADIDA === -->
+
     <style>
         :root {
             --color-primary: #111827;
@@ -111,6 +124,20 @@
             opacity: 1;
             transform: translateY(0);
         }
+        
+        /* Estilos para el botón de PWA */
+        .cta-install-button {
+            background-color: transparent;
+            border: 2px solid var(--color-accent-end);
+            color: var(--color-accent-end);
+            transition: all 0.3s ease;
+        }
+        .cta-install-button:hover {
+            background-color: var(--color-accent-end);
+            color: white;
+            transform: translateY(-2px);
+        }
+
     </style>
 </head>
 <body class="bg-gray-900 text-gray-200">
@@ -153,10 +180,19 @@
                 <p class="text-lg md:text-xl text-gray-300 max-w-3xl mx-auto mb-8">
                     Tradeator es el simulador definitivo que te prepara para el mundo real de la bolsa. Aprende, practica y conviértete en un inversor experto.
                 </p>
-                <!-- Enlace actualizado con la clase 'cta-tradeator' -->
-                <a href="trading.html" class="cta-button inline-block text-white font-bold text-lg py-4 px-10 rounded-lg cta-tradeator">
-                    Empezar Ahora
-                </a>
+                
+                <div class="flex flex-col sm:flex-row justify-center space-y-4 sm:space-y-0 sm:space-x-4">
+                    <!-- Botón Principal: Empezar Ahora -->
+                    <a href="trading.html" class="cta-button inline-block text-white font-bold text-lg py-4 px-10 rounded-lg cta-tradeator">
+                        Empezar Ahora
+                    </a>
+                    
+                    <!-- Botón PWA: Oculto por defecto, visible por JS -->
+                    <button id="install-app-button" class="hidden cta-install-button inline-block font-bold text-lg py-4 px-10 rounded-lg">
+                        Instalar App
+                    </button>
+                </div>
+                
                 <p class="mt-4 text-sm text-gray-500">Gratis · No se requiere tarjeta de crédito</p>
             </div>
         </section>
@@ -173,7 +209,7 @@
                 <!-- Feature 1 -->
                 <div class="glass-card p-8 rounded-2xl text-center scroll-animate" style="transition-delay: 100ms;">
                     <div class="mb-5 inline-block p-4 bg-gray-800 rounded-full">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h2"/><path d="M20 12h2"/><path d="m18.36 5.64.14.14"/><path d="m6 6 .14-.14"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m6.34 17.66-.14.14"/><path d="m18.5 18.5-.14-.14"/><path d="M12 18a6 6 0 1 0 0-12 6 6 0 0 0 0 12Z"/><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/></svg>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
                     </div>
                     <h4 class="text-2xl font-bold text-white mb-2">Datos en Tiempo Real</h4>
                     <p class="text-gray-400">Opera con precios de acciones y activos reales de los mercados más importantes del mundo.</p>
@@ -294,12 +330,11 @@
             });
         });
 
-        // === SCRIPT DE REDIRECCIÓN ===
+        // === SCRIPT DE REDIRECCIÓN (EXISTENTE) ===
         // 1. Escuchamos cuando el DOM esté listo
         document.addEventListener('DOMContentLoaded', function() {
             
             // 2. Buscamos TODOS los botones que deben llevar a la app
-            // Les he añadido la clase 'cta-tradeator' a los enlaces en el HTML
             const tradeLinks = document.querySelectorAll('.cta-tradeator');
 
             // 3. Añadimos un escuchador de 'click' a cada uno
@@ -330,6 +365,61 @@
                     window.location.href = destinationUrl;
                 });
             });
+            
+            // === INICIO: LÓGICA DE INSTALACIÓN PWA AÑADIDA ===
+            let deferredPrompt; 
+            const installButton = document.getElementById('install-app-button');
+
+            // 1. Almacena el evento de instalación cuando esté disponible
+            window.addEventListener('beforeinstallprompt', (e) => {
+                e.preventDefault();
+                deferredPrompt = e;
+                
+                // Solo muestra el botón si la app no está en modo standalone (ya instalada)
+                if (installButton && !isAppInstalled()) {
+                    installButton.classList.remove('hidden');
+                    installButton.addEventListener('click', handleInstallClick);
+                }
+            });
+            
+            // 2. Maneja el clic en el botón de instalación
+            function handleInstallClick() {
+                if (deferredPrompt) {
+                    // Muestra el aviso de instalación del navegador
+                    deferredPrompt.prompt();
+                    // Espera la respuesta del usuario
+                    deferredPrompt.userChoice.then((choiceResult) => {
+                        if (choiceResult.outcome === 'accepted') {
+                            console.log('Usuario aceptó la instalación A2HS');
+                        } else {
+                            console.log('Usuario rechazó la instalación A2HS');
+                        }
+                        deferredPrompt = null;
+                        if (installButton) {
+                            installButton.classList.add('hidden');
+                        }
+                    });
+                }
+            }
+            
+            // 3. Oculta el botón si la app ya está instalada
+            window.addEventListener('appinstalled', () => {
+                console.log('Tradeator fue instalado con éxito.');
+                if (installButton) {
+                    installButton.classList.add('hidden');
+                }
+            });
+            
+            // Función simple para verificar si ya está en modo app
+            function isAppInstalled() {
+                return window.matchMedia('(display-mode: standalone)').matches || document.referrer.includes('android-app://');
+            }
+
+            // Ocultar el botón si la app ya está instalada al cargar la página
+            if (isAppInstalled() && installButton) {
+                installButton.classList.add('hidden');
+            }
+            // === FIN: LÓGICA DE INSTALACIÓN PWA AÑADIDA ===
         });
     </script>
 </body>
