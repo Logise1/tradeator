@@ -122,7 +122,8 @@
             <nav class="hidden md:flex space-x-8 items-center text-lg">
                 <a href="#features" class="hover:text-cyan-400 transition-colors duration-300">Características</a>
                 <a href="#testimonials" class="hover:text-cyan-400 transition-colors duration-300">Testimonios</a>
-                <a href="/tradeator/trading" class="bg-gray-700/50 hover:bg-gray-600/50 text-white font-semibold py-2 px-5 rounded-lg transition-colors border border-gray-600">
+                <!-- Enlace actualizado con la clase 'cta-tradeator' -->
+                <a href="trading.html" class="bg-gray-700/50 hover:bg-gray-600/50 text-white font-semibold py-2 px-5 rounded-lg transition-colors border border-gray-600 cta-tradeator">
                     Iniciar Sesión
                 </a>
             </nav>
@@ -152,7 +153,8 @@
                 <p class="text-lg md:text-xl text-gray-300 max-w-3xl mx-auto mb-8">
                     Tradeator es el simulador definitivo que te prepara para el mundo real de la bolsa. Aprende, practica y conviértete en un inversor experto.
                 </p>
-                <a href="/tradeator/trading" class="cta-button inline-block text-white font-bold text-lg py-4 px-10 rounded-lg">
+                <!-- Enlace actualizado con la clase 'cta-tradeator' -->
+                <a href="trading.html" class="cta-button inline-block text-white font-bold text-lg py-4 px-10 rounded-lg cta-tradeator">
                     Empezar Ahora
                 </a>
                 <p class="mt-4 text-sm text-gray-500">Gratis · No se requiere tarjeta de crédito</p>
@@ -246,7 +248,8 @@
         <div class="container mx-auto px-4 text-center scroll-animate">
              <h3 class="text-4xl md:text-5xl font-bold text-white">¿Listo para ser un <span class="text-gradient">Tradeator</span>?</h3>
              <p class="text-gray-400 mt-4 mb-10 max-w-2xl mx-auto text-lg">Únete a miles de usuarios que ya están construyendo su futuro financiero. Tu viaje como inversor empieza aquí y ahora.</p>
-             <a href="/tradeator/trading" class="cta-button inline-block text-white font-bold text-xl py-4 px-12 rounded-lg">
+             <!-- Enlace actualizado con la clase 'cta-tradeator' -->
+             <a href="trading.html" class="cta-button inline-block text-white font-bold text-xl py-4 px-12 rounded-lg cta-tradeator">
                 Crea tu Cuenta Gratis
             </a>
         </div>
@@ -291,6 +294,43 @@
             });
         });
 
+        // === SCRIPT DE REDIRECCIÓN ===
+        // 1. Escuchamos cuando el DOM esté listo
+        document.addEventListener('DOMContentLoaded', function() {
+            
+            // 2. Buscamos TODOS los botones que deben llevar a la app
+            // Les he añadido la clase 'cta-tradeator' a los enlaces en el HTML
+            const tradeLinks = document.querySelectorAll('.cta-tradeator');
+
+            // 3. Añadimos un escuchador de 'click' a cada uno
+            tradeLinks.forEach(link => {
+                link.addEventListener('click', function(event) {
+                    // 4. Prevenimos que el enlace funcione de forma normal
+                    event.preventDefault(); 
+                    
+                    let destinationUrl = 'short.html'; // Destino por defecto: la explicación
+
+                    try {
+                        // 5. Comprobamos el localStorage
+                        const hasSeen = localStorage.getItem('hasSeenSell');
+                        
+                        if (hasSeen === 'true') {
+                            // 6. Si YA lo ha visto, el destino es la app principal
+                            destinationUrl = 'trading.html';
+                        }
+                        // 7. Si es 'false' o 'null', se queda como 'short.html'
+
+                    } catch (e) {
+                        console.error("Error al leer localStorage: ", e);
+                        // Si hay un error, por seguridad, mostramos la explicación
+                        destinationUrl = 'short.html';
+                    }
+                    
+                    // 8. Redirigimos al usuario al destino correcto
+                    window.location.href = destinationUrl;
+                });
+            });
+        });
     </script>
 </body>
 </html>

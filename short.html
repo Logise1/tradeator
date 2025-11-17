@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>¡Nueva Función: Vender en Corto!</title>
+    <!-- Cargamos Tailwind CSS para estilos rápidos -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Usamos la misma fuente que tu otra web para mantener consistencia -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap" rel="stylesheet">
+    <style>
+        /* Estilos básicos */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #111827; /* Fondo oscuro */
+            color: #f9fafb; /* Texto claro */
+        }
+        
+        /* Contenedor principal */
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Tarjetas de explicación */
+        .card {
+            background-color: #1f2937; /* Fondo de tarjeta más claro */
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 20px;
+            border: 1px solid #374151;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+        }
+
+        /* Títulos de las tarjetas */
+        .card-title {
+            font-size: 1.75rem; /* 28px */
+            font-weight: 800;
+            margin-bottom: 12px;
+        }
+        
+        /* Iconos grandes para la explicación */
+        .icon {
+            font-size: 3rem; /* 48px */
+            margin-bottom: 16px;
+        }
+
+        /* Colores para subir y bajar */
+        .text-verde {
+            color: #34d399; /* Verde (ganar, subir) */
+        }
+        
+        .text-rojo {
+            color: #f87171; /* Rojo (perder, bajar) */
+        }
+
+    </style>
+</head>
+<body class="antialiased">
+
+    <div class="container pt-12">
+
+        <h1 class="text-4xl md:text-5xl font-black text-center mb-10">
+            ¡Novedad en Tradeator: "Vender en Corto"!
+        </h1>
+
+        <p class="text-xl text-center text-gray-300 mb-12">
+            ¡Hola, trader! Ya dominas el arte de <strong>"Comprar en Largo"</strong> (apostar a que el precio sube).
+            <br>Ahora, añadimos una nueva herramienta: ¿qué pasa si crees que el precio va a <strong>bajar</strong>?
+        </p>
+
+        <!-- CARD 1: Comprar Normal (Long) -->
+        <div class="card">
+            <div class="icon text-verde">📈</div>
+            <h2 class="card-title text-verde">1. Lo que ya conoces: Comprar (Largo)</h2>
+            <p class="text-lg text-gray-300 mb-4">
+                Esto es lo que has estado haciendo. Es como...
+            </p>
+            <ul class="list-disc list-inside text-lg space-y-2">
+                <li>Ves un juguete nuevo que cuesta <strong>10€</strong>.</li>
+                <li>Tú crees que se pondrá de moda y valdrá más. ¡Así que lo <strong>compras</strong>!</li>
+                <li>Pasa un mes y... ¡tenías razón! El juguete es súper popular y ahora vale <strong>30€</strong>.</li>
+                <li>Decides <strong>venderlo</strong>.</li>
+            </ul>
+            <hr class="border-gray-600 my-6">
+            <p class="text-2xl font-bold text-center">
+                ¡Ganaste 20€! (30€ - 10€ = 20€)
+            </p>
+            <p class="text-center text-gray-400 mt-2">A esto se le llama "comprar en largo" o "ir en largo".</p>
+        </div>
+
+        <!-- CARD 2: Vender en Corto (Short) -->
+        <div class="card">
+            <div class="icon text-rojo">📉</div>
+            <h2 class="card-title text-rojo">2. La Novedad: Vender en Corto (¡Apostar a que BAJA!)</h2>
+            <p class="text-lg text-gray-300 mb-4">
+                Aquí es donde se pone interesante. ¿Y si crees que algo va a valer <em>menos</em>?
+                <br>
+                Esto es como...
+            </p>
+            <ul class="list-disc list-inside text-lg space-y-2">
+                <li>Ves un juguete que cuesta <strong>50€</strong>, pero crees que es muy aburrido y pronto nadie lo querrá.</li>
+                <li>Tu amigo tiene ese juguete. Le dices: "Oye, ¿me <strong>prestas</strong> tu juguete? Te lo devuelvo la semana que viene".</li>
+                <li>Tu amigo te lo da. Tú, rápidamente, <strong>vendes</strong> ese juguete (que no es tuyo) por <strong>50€</strong>. Ahora tienes 50€ en el bolsillo.</li>
+                <li>Pasa una semana y... ¡tenías razón! El juguete ya no le gusta a nadie y su precio <strong>baja a 20€</strong>.</li>
+                <li>Con los 50€ que tenías, <strong>compras</strong> el juguete por solo <strong>20€</strong> y se lo devuelves a tu amigo (¡él está contento, tiene su juguete de vuelta!).</li>
+            </ul>
+            <hr class="border-gray-600 my-6">
+            <p class="text-2xl font-bold text-center">
+                ¡Te quedaste con 30€! (50€ que ganaste - 20€ que gastaste = 30€)
+            </p>
+            <p class="text-center text-gray-400 mt-2">A esto se le llama "vender en corto" o "ir en corto".</p>
+        </div>
+
+        <!-- Resumen -->
+        <div class="card bg-gray-800 border-cyan-500">
+             <h3 class="card-title text-center text-cyan-400">En Resumen</h3>
+             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-center">
+                <div class="bg-gray-900 p-4 rounded-lg">
+                    <p class="text-2xl font-bold text-verde">COMPRAR (Largo) 📈</p>
+                    <p class="text-lg">Ganas dinero si el precio <strong>SUBE</strong>.</p>
+                </div>
+                <div class="bg-gray-900 p-4 rounded-lg">
+                    <p class="text-2xl font-bold text-rojo">VENDER (Corto) 📉</p>
+                    <p class="text-lg">Ganas dinero si el precio <strong>BAJA</strong>.</p>
+                </div>
+             </div>
+             <p class="text-lg text-center text-gray-300 mt-6">
+                 <strong>¡Importante!</strong> Vender en corto es mucho más arriesgado. Si el precio del juguete que pediste prestado SUBE a 100€, ¡tendrás que comprarlo por 100€ para devolverlo y perderás dinero!
+             </p>
+        </div>
+
+        <!-- Footer -->
+        <footer class="text-center py-10 text-gray-500">
+            <p>¡Recuerda que "vender en corto" tiene más riesgo! Practica primero.</p>
+            <!-- Le añadimos un ID al botón para seleccionarlo con JS -->
+            <a id="returnButton" href="trading.html" class="inline-block mt-4 bg-cyan-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-cyan-500 transition-colors duration-300">
+                ¡Entendido! Ir a Tradeator
+            </a>
+        </footer>
+
+    </div>
+
+    <!-- Script para guardar en localStorage -->
+    <script>
+        // Espera a que el DOM esté cargado
+        document.addEventListener('DOMContentLoaded', function() {
+            // Selecciona el botón por su ID
+            const returnButton = document.getElementById('returnButton');
+            
+            if (returnButton) {
+                // Añade un evento de 'click'
+                returnButton.addEventListener('click', function(event) {
+                    // Previene que el enlace navegue inmediatamente
+                    event.preventDefault();
+                    
+                    // Intenta guardar el valor en localStorage
+                    try {
+                        localStorage.setItem('hasSeenSell', 'true');
+                        console.log('hasSeenSell guardado en localStorage.');
+                    } catch (e) {
+                        // Informa si hay un error (ej. cookies desactivadas, modo incógnito)
+                        console.error("No se pudo guardar en localStorage:", e);
+                    }
+                    
+                    // Después de guardar, redirige a la página de trading
+                    window.location.href = this.href;
+                });
+            }
+        });
+    </script>
+
+</body>
+</html>
