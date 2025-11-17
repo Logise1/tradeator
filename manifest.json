@@ -2,7 +2,7 @@
       "name": "Tradeator",
       "short_name": "Tradeator",
       "description": "Tu plataforma de simulación de trading",
-      "start_url": "/tradeator/trading",
+      "start_url": "trading.html",
       "display": "standalone",
       "background_color": "#111827",
       "theme_color": "#111827",
