@@ -283,8 +283,8 @@
                                 <div>
                                     <label for="trigger-action" class="block text-sm font-medium text-gray-300 mb-1">Acción</label>
                                     <select id="trigger-action" required class="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
-                                        <option value="sell">Vender</option>
-                                        <option value="buy">Comprar</option>
+                                        <option value="sell">Vender (o Vender en Corto)</option>
+                                        <option value="buy">Comprar (o Cubrir Corto)</option>
                                     </select>
                                 </div>
                                 <div>
@@ -711,6 +711,8 @@
                     const quantity = state.portfolio[symbol];
                     const stockData = state.marketStocks.find(s => s.symbol === symbol);
                     if (stockData) {
+                        // MODIFICACIÓN: La valoración es (precio * cantidad)
+                        // Si la cantidad es -10 (short) y el precio es 100, el valor es -1000 (una deuda)
                         portfolioValue += stockData.price * quantity;
                     }
                 }
@@ -818,10 +820,13 @@
                     }
                 }
 
-                if (action === 'sell' && (state.portfolio[symbol] || 0) < quantity) {
-                    showNotification(`No tienes ${quantity} acciones de ${symbol} para vender. Tienes: ${state.portfolio[symbol] || 0}.`, 'error');
-                    return;
-                }
+                // --- MODIFICACIÓN ---
+                // Se elimina la comprobación de si tiene suficientes acciones para VENDER.
+                // if (action === 'sell' && (state.portfolio[symbol] || 0) < quantity) {
+                //     showNotification(`No tienes ${quantity} acciones de ${symbol} para vender. Tienes: ${state.portfolio[symbol] || 0}.`, 'error');
+                //     return;
+                // }
+                // --- FIN DE MODIFICACIÓN ---
 
                 const originalButtonText = triggerSubmitButton.textContent;
                 setButtonLoading(triggerSubmitButton, originalButtonText, true);
@@ -1136,8 +1141,10 @@
                             <p class="font-semibold text-lg">$${price.toFixed(2)}</p>
                             <p class="text-sm ${changeClass}">${changeSign}${change.toFixed(2)}$ (${changeSign}${changesPercentage.toFixed(2)}%)</p>
                         </div>
-                        <div class="flex justify-end ml-4">
+                        <!-- MODIFICACIÓN: Añadido botón de VENDER (Short) -->
+                        <div class="flex flex-col md:flex-row justify-end ml-2 space-y-1 md:space-y-0 md:space-x-1">
                             <button data-symbol="${symbol}" data-type="buy" class="trade-btn text-xs font-bold bg-green-600 hover:bg-green-500 text-white py-2 px-3 rounded-md">COMPRAR</button>
+                            <button data-symbol="${symbol}" data-type="sell" class="trade-btn text-xs font-bold bg-red-600 hover:bg-red-500 text-white py-2 px-3 rounded-md">VENDER</button>
                         </div>`;
                     stockMarketListEl.appendChild(stockEl);
                 });
@@ -1175,6 +1182,8 @@
                 }
                 for (const symbol in state.portfolio) {
                     const quantity = state.portfolio[symbol];
+                    if (quantity === 0) continue; // No mostrar si la cantidad es 0
+
                     const stockData = state.marketStocks.find(s => s.symbol === symbol);
                     
                     const currentValue = stockData ? stockData.price * quantity : 0;
@@ -1182,8 +1191,11 @@
 
                     let stockDailyProfitLossHtml = '';
                     if (stockData && stockData.change !== undefined && stockData.changesPercentage !== undefined) {
+                        // MODIFICACIÓN: El cálculo de P/L diario (change * quantity)
+                        // funciona automáticamente para cortos.
+                        // Si (change = +$2) y (quantity = -10), P/L = -$20 (Pérdida, correcto)
                         const dailyChangeAmount = stockData.change * quantity; 
-                        const dailyChangePercentage = stockData.changesPercentage; 
+                        const dailyChangePercentage = stockData.changesPercentage * (quantity > 0 ? 1 : -1); // Invertir % si es corto
                         const plClass = dailyChangeAmount >= 0 ? 'profit' : 'loss';
                         const plSign = dailyChangeAmount >= 0 ? '+' : '';
                         stockDailyProfitLossHtml = `
@@ -1192,6 +1204,11 @@
                             </p>`;
                     }
 
+                    // MODIFICACIÓN: Añadir (Long) o (Short)
+                    const posType = quantity > 0 ? 'Long' : 'Short';
+                    const posColor = quantity > 0 ? 'text-green-400' : 'text-red-400';
+                    const absQuantity = Math.abs(quantity);
+
                     const el = document.createElement('div');
                     el.className = 'stock-item bg-gray-900 p-4 rounded-lg cursor-pointer hover:bg-gray-700/50';
                     el.dataset.symbol = symbol; 
@@ -1199,7 +1216,7 @@
                         <div class="flex justify-between items-center">
                             <div>
                                 <p class="font-bold text-lg">${symbol}</p>
-                                <p class="text-sm text-gray-400">${quantity} acciones</p>
+                                <p class="text-sm text-gray-400">${absQuantity} acciones (<span class="${posColor} font-semibold">${posType}</span>)</p>
                             </div>
                             <div class="text-right">
                                 <p class="font-semibold text-lg">$${currentValue.toFixed(2)}</p>
@@ -1207,8 +1224,10 @@
                                 ${stockDailyProfitLossHtml}
                             </div>
                         </div>
-                        <div class="mt-2">
-                            <button data-symbol="${symbol}" data-type="sell" class="trade-btn w-full text-xs font-bold bg-red-600 hover:bg-red-500 text-white py-2 px-3 rounded-md">VENDER</button>
+                        <div class="mt-2 grid grid-cols-2 gap-2">
+                            <!-- MODIFICACIÓN: Añadido botón de COMPRAR (Cubrir corto) -->
+                            <button data-symbol="${symbol}" data-type="buy" class="trade-btn w-full text-xs font-bold bg-green-600 hover:bg-green-500 text-white py-2 px-3 rounded-md">${quantity < 0 ? 'CUBRIR' : 'COMPRAR'}</button>
+                            <button data-symbol="${symbol}" data-type="sell" class="trade-btn w-full text-xs font-bold bg-red-600 hover:bg-red-500 text-white py-2 px-3 rounded-md">${quantity > 0 ? 'VENDER' : 'V. CORTO'}</button>
                         </div>`;
                     portfolioListEl.appendChild(el);
                 }
@@ -1319,14 +1338,31 @@
                     showNotification(`No se encontraron datos de precio actuales para ${symbol}. Inténtalo de nuevo más tarde.`, 'error');
                     return;
                 }
-                const actionText = type === 'buy' ? 'Comprar' : 'Vender';
-                modalTitleEl.textContent = `${actionText} ${symbol}`;
-                confirmButtonEl.textContent = `Confirmar ${actionText}`;
+                
+                // MODIFICACIÓN: Adaptar texto para Venta en Corto
+                const currentHolding = state.portfolio[symbol] || 0;
+                let actionText = '';
+                if (type === 'buy') {
+                    actionText = (currentHolding < 0) ? `Cubrir Corto ${symbol}` : `Comprar ${symbol}`;
+                } else {
+                    actionText = (currentHolding > 0) ? `Vender ${symbol}` : `Vender en Corto ${symbol}`;
+                }
+
+                modalTitleEl.textContent = actionText;
+                confirmButtonEl.textContent = `Confirmar ${actionText.split(' ')[0]}`;
                 confirmButtonEl.className = `px-4 py-2 rounded-md font-semibold ${type === 'buy' ? 'bg-green-600 hover:bg-green-500' : 'bg-red-600 hover:bg-red-500'}`;
                 cashRemainingLabel.textContent = type === 'buy' ? 'Efectivo restante:' : 'Efectivo después:';
 
                 sharesInputEl.value = '1';
-                sharesInputEl.max = type === 'buy' ? Math.floor(state.cash / stock.price) : state.portfolio[symbol] || 0;
+                
+                // MODIFICACIÓN: Quitar el límite (max) al vender (para permitir ventas en corto)
+                if (type === 'buy') {
+                    sharesInputEl.max = Math.floor(state.cash / stock.price);
+                } else {
+                    sharesInputEl.removeAttribute('max');
+                }
+                // --- FIN DE MODIFICACIÓN ---
+                
                 sharesInputEl.min = 1;
 
                 updateTradeModalCalculations();
@@ -1393,10 +1429,14 @@
                     showNotification('Fondos insuficientes para esta compra.', 'error');
                     return;
                 }
-                if (type === 'sell' && (state.portfolio[symbol] || 0) < quantity) {
-                    showNotification('No tienes suficientes acciones para vender.', 'error');
-                    return;
-                }
+                
+                // --- MODIFICACIÓN ---
+                // Se elimina la comprobación de si tiene suficientes acciones para VENDER.
+                // if (type === 'sell' && (state.portfolio[symbol] || 0) < quantity) {
+                //    showNotification('No tienes suficientes acciones para vender.', 'error');
+                //    return;
+                // }
+                // --- FIN DE MODIFICACIÓN ---
 
                 const originalConfirmText = confirmButtonEl.textContent;
                 setButtonLoading(confirmButtonEl, originalConfirmText, true);
@@ -1404,7 +1444,7 @@
                 const tradeSuccess = await performTrade(symbol, quantity, type);
                 
                 if (tradeSuccess) {
-                     showNotification(type === 'buy' ? 'Compra realizada' : 'Venta realizada', 'success');
+                     showNotification(type === 'buy' ? 'Operación de compra realizada' : 'Operación de venta realizada', 'success');
                 }
                 
                 setButtonLoading(confirmButtonEl, originalConfirmText, false);
