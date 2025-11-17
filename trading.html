@@ -318,7 +318,7 @@
                                     <input type="date" id="trigger-date" class="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
                                 </div>
                                 <div>
-                                    <label for="trigger-time" class="block text-sm font-medium text-gray-300 mb-1">Hora de Ejecución (UTC)</label>
+                                    <label for="trigger-time" class="block text-sm font-medium text-gray-300 mb-1">Hora de Ejecución (España, CET/CEST)</label>
                                     <input type="time" id="trigger-time" step="60" class="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
                                 </div>
                             </div>
@@ -331,7 +331,7 @@
                         <!-- List of active triggers -->
                         <h3 class="text-xl font-bold text-white mb-2">Programaciones Activas</h3>
                         <p class="text-sm text-yellow-400 bg-yellow-900/50 p-2 rounded-md mb-4">
-                            <strong>Nota (Ejecución en cliente):</strong> Las programaciones se guardan en Firebase (servidor), pero **la ejecución se realiza solo mientras esta aplicación (o cualquier otra de Tradeator) esté abierta en un navegador**, ya que el Worker de Cloudflare no puede ejecutarlas automáticamente.
+                            <strong>Nota (Ejecución Centralizada):</strong> Las programaciones se guardan en Firebase. **Cualquier cliente activo de Tradeator (tú u otro usuario) que se conecte ejecutará los trades pendientes** a través del Worker, resolviendo el problema de autenticación cruzada.
                         </p>
                         <div id="active-triggers-list" class="space-y-3 max-h-[40vh] overflow-y-auto pr-2">
                             <!-- Triggers will be rendered here by JS -->
@@ -408,6 +408,9 @@
             const API_BASE_URL = 'https://finances.logise1123.workers.dev';
             // Base URL for live values
             const API_LIVE_VALUES_URL = 'https://finances.logise1123.workers.dev/livevalues';
+            
+            // ATENCIÓN: Debes configurar esta clave secreta en el Worker de Cloudflare
+            const WORKER_TRIGGER_SECRET = "YOUR_SUPER_SECRET_KEY_HERE_FOR_PRIVILEGED_EXECUTION";
 
             const defaultSymbols = ['AAPL', 'GOOGL', 'MSFT', 'TSLA', 'AMZN', 'NVDA', 'META', 'JPM', 'V', 'NFLX'];
 
@@ -440,9 +443,10 @@
                 previousDayPortfolioValue: 0, // New state for previous day portfolio value
                 activeFilter: 'all', 
                 triggers: {}, // { "triggerId": { ... } } - OJO: Solo los triggers del usuario actual
-                allUserTriggers: {}, // NEW: { "username": { "triggerId": {...} } } - Para la ejecución multi-usuario
                 isCheckingTriggers: false, // NEW: Flag to prevent concurrent trigger checks
             };
+            
+            let isLoginMode = true; // MOVED DECLARATION HERE
 
             // Interval IDs for data updates
             let marketDataInterval = null;
@@ -451,7 +455,7 @@
             let currentChartInstance = null; // To hold the Chart.js instance for destruction
             const MARKET_DATA_UPDATE_INTERVAL_MS = 3000; // Update market prices every 3 seconds
             const LEADERBOARD_UPDATE_INTERVAL_MS = 10000; // Update leaderboard every 10 seconds
-            const TRIGGER_CHECK_INTERVAL_MS = 3000; // Check triggers every 3 seconds (sync with market data)
+            const TRIGGER_CHECK_INTERVAL_MS = 30000; // SOLICITADO: Check triggers every 30 seconds
 
             // --- DOM ELEMENTS ---
             const globalLoadingOverlay = document.getElementById('global-loading-overlay');
@@ -474,7 +478,6 @@
             const marketLoader = document.getElementById('market-loader');
             const leaderboardListEl = document.getElementById('leaderboard-list');
 
-            // Chart Modal Elements
             const chartModal = document.getElementById('chart-modal');
             const chartModalTitleEl = document.getElementById('chart-modal-title');
             const closeChartModalButton = document.getElementById('close-chart-modal-button');
@@ -482,28 +485,22 @@
             const chartLoader = document.getElementById('chart-loader');
             const chartErrorMessage = document.getElementById('chart-error-message');
             
-            // Daily Summary Elements
             const dailySummaryTextEl = document.getElementById('daily-summary-text');
             const dailySummaryErrorEl = document.getElementById('daily-summary-error');
 
-
-            // Top/Bottom buttons
             const topGainersButton = document.getElementById('top-gainers-button');
             const topLosersButton = document.getElementById('top-losers-button');
             const canAffordButton = document.getElementById('can-afford-button');
             const aiRecommendationsButton = document.getElementById('ai-recommendations-button');
 
-            // Filter Elements
             const filterContainer = document.getElementById('filter-container');
             const filterButtons = document.querySelectorAll('.filter-btn');
 
-            // NEW: Tab Elements
             const tabMarket = document.getElementById('tab-market');
             const tabTriggers = document.getElementById('tab-triggers');
             const marketContent = document.getElementById('market-content');
             const triggersContent = document.getElementById('triggers-content');
 
-            // NEW: Trigger Form Elements
             const createTriggerForm = document.getElementById('create-trigger-form');
             const triggerSymbolEl = document.getElementById('trigger-symbol');
             const triggerQuantityEl = document.getElementById('trigger-quantity');
@@ -517,45 +514,44 @@
             const triggerTimeEl = document.getElementById('trigger-time');
             const triggerSubmitButton = document.getElementById('trigger-submit-button');
             const activeTriggersListEl = document.getElementById('active-triggers-list');
+            
+            // Trade Modal Elements
+            const modal = document.getElementById('trade-modal');
+            const modalTitleEl = document.getElementById('modal-title');
+            const sharesInputEl = document.getElementById('shares-input');
+            const modalTotalCostEl = document.getElementById('modal-total-cost');
+            const modalCashRemainingEl = document.getElementById('modal-cash-remaining');
+            const cashRemainingLabel = document.getElementById('cash-remaining-label');
+            const cancelButtonEl = document.getElementById('cancel-button');
+            const confirmButtonEl = document.getElementById('confirm-button');
+
 
             // --- LOADER FUNCTIONS ---
-            function showLoader() {
-                marketLoader.classList.remove('hidden');
-            }
-
-            function hideLoader() {
-                marketLoader.classList.add('hidden');
-            }
-
-            function showGlobalLoader() {
-                globalLoadingOverlay.classList.add('visible');
-                authView.classList.add('hidden'); // Hide auth view immediately
-            }
-
-            function hideGlobalLoader() {
-                globalLoadingOverlay.classList.remove('visible');
-            }
+            function showLoader() { marketLoader.classList.remove('hidden'); }
+            function hideLoader() { marketLoader.classList.add('hidden'); }
+            function showGlobalLoader() { globalLoadingOverlay.classList.add('visible'); authView.classList.add('hidden'); }
+            function hideGlobalLoader() { globalLoadingOverlay.classList.remove('visible'); }
 
             function setButtonLoading(buttonElement, originalText, isLoading, loadingText = 'Cargando...') {
                 if (isLoading) {
-                    buttonElement.dataset.originalText = originalText; // Store original text
+                    buttonElement.dataset.originalText = originalText;
                     buttonElement.textContent = loadingText;
                     buttonElement.disabled = true;
-                    buttonElement.style.opacity = '0.7'; // Dim button
+                    buttonElement.style.opacity = '0.7';
                 } else {
-                    // Check if originalText is passed explicitly or if it's stored in dataset
-                    buttonElement.textContent = buttonElement.dataset.originalText || originalText; // Restore original text
+                    buttonElement.textContent = buttonElement.dataset.originalText || originalText;
                     buttonElement.disabled = false;
-                    buttonElement.style.opacity = '1'; // Restore full opacity
+                    buttonElement.style.opacity = '1';
                 }
             }
 
-            // --- AUTHENTICATION ---
-            let isLoginMode = true;
+            // --- AUTHENTICATION & INITIALIZATION ---
+            
+            // let isLoginMode = true; // REMOVED FROM HERE
 
             async function startAppLoadingSequence() {
                 try {
-                    await initializeMainApp(); // Initialize all app data
+                    await initializeMainApp();
                     hideGlobalLoader();
                     authView.classList.add('hidden'); 
                     mainAppView.classList.remove('hidden');
@@ -575,28 +571,19 @@
             async function checkForSavedSession() {
                 const savedUsername = localStorage.getItem('stock_simulator_username');
                 const savedPassword = localStorage.getItem('stock_simulator_password');
-
                 if (savedUsername && savedPassword) {
                     try {
                         showGlobalLoader();
                         const response = await fetch(`${API_BASE_URL}/login`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ 
-                                username: savedUsername, 
-                                password: savedPassword 
-                            }),
+                            body: JSON.stringify({ username: savedUsername, password: savedPassword }),
                         });
-
                         const data = await response.json();
-                        if (!response.ok) {
-                            throw new Error(data.message || 'Error en la autenticación');
-                        }
-
+                        if (!response.ok) throw new Error(data.message || 'Error en la autenticación');
                         state.authToken = data.token;
                         state.username = savedUsername;
                         showNotification(`Bienvenido de nuevo, ${savedUsername}`, 'info');
-                        
                         await startAppLoadingSequence();
                     } catch (error) {
                         hideGlobalLoader();
@@ -613,36 +600,21 @@
                     mainAppView.classList.add('hidden');
                 }
             }
-
-            function toggleAuthMode(e) {
-                if(e) e.preventDefault();
-                isLoginMode = !isLoginMode;
-                authTitle.textContent = isLoginMode ? 'Iniciar Sesión' : 'Crear Cuenta';
-                authButtonText.textContent = isLoginMode ? 'Iniciar Sesión' : 'Crear Cuenta';
-                toggleAuthModeLink.textContent = isLoginMode ? 'crea una cuenta nueva' : 'inicia sesión con una cuenta existente';
-            }
+            
+            function toggleAuthMode(e) { /* ... */ if(e) e.preventDefault(); isLoginMode = !isLoginMode; authTitle.textContent = isLoginMode ? 'Iniciar Sesión' : 'Crear Cuenta'; authButtonText.textContent = isLoginMode ? 'Iniciar Sesión' : 'Crear Cuenta'; toggleAuthModeLink.textContent = isLoginMode ? 'crea una cuenta nueva' : 'inicia sesión con una cuenta existente'; }
 
             async function handleAuthSubmit(e) {
                 e.preventDefault();
                 const username = authForm.username.value;
                 const password = authForm.password.value;
                 const endpoint = isLoginMode ? '/login' : '/signup';
-
-                const originalButtonText = authButtonText.textContent;
+                const originalButtonText = authSubmitButton.textContent;
                 setButtonLoading(authSubmitButton, originalButtonText, true);
                 
                 try {
-                    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ username, password }),
-                    });
-
+                    const response = await fetch(`${API_BASE_URL}${endpoint}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }), });
                     const data = await response.json();
-                    if (!response.ok) {
-                        throw new Error(data.message || 'Error en la autenticación');
-                    }
-
+                    if (!response.ok) throw new Error(data.message || 'Error en la autenticación');
                     if (isLoginMode) {
                         state.authToken = data.token;
                         state.username = username;
@@ -665,46 +637,19 @@
             function handleLogout() {
                 if (marketDataInterval) clearInterval(marketDataInterval);
                 if (leaderboardInterval) clearInterval(leaderboardInterval);
-                if (triggerCheckInterval) clearInterval(triggerCheckInterval); // NEW: Clear trigger interval
-                marketDataInterval = null;
-                leaderboardInterval = null;
-                triggerCheckInterval = null;
-                
-                if (currentChartInstance) {
-                    currentChartInstance.destroy();
-                    currentChartInstance = null;
-                }
-                localStorage.removeItem('stock_simulator_username');
-                localStorage.removeItem('stock_simulator_password');
-                state.authToken = null;
-                state.username = null;
-                state.portfolio = {};
-                state.cash = 0;
-                state.historicalDataCache = {};
-                state.hourlyDataCache = {};
-                state.symbolsWithFetchedHistory = new Set();
-                state.dailyProfitLoss = null;
-                state.previousDayPortfolioValue = 0;
-                state.activeFilter = 'all';
-                state.triggers = {}; 
-                state.allUserTriggers = {}; // NEW: Clear all triggers on logout
-
+                if (triggerCheckInterval) clearInterval(triggerCheckInterval);
+                marketDataInterval = null; leaderboardInterval = null; triggerCheckInterval = null;
+                if (currentChartInstance) { currentChartInstance.destroy(); currentChartInstance = null; }
+                localStorage.removeItem('stock_simulator_username'); localStorage.removeItem('stock_simulator_password');
+                state.authToken = null; state.username = null; state.portfolio = {}; state.cash = 0; state.historicalDataCache = {};
+                state.hourlyDataCache = {}; state.symbolsWithFetchedHistory = new Set(); state.dailyProfitLoss = null; state.previousDayPortfolioValue = 0;
+                state.activeFilter = 'all'; state.triggers = {}; state.allUserTriggers = {};
                 mainAppView.style.opacity = '0';
-
-                setTimeout(() => {
-                    mainAppView.classList.add('hidden');
-                    authView.classList.remove('hidden');
-                    authView.style.opacity = '1';
-                }, 500);
+                setTimeout(() => { mainAppView.classList.add('hidden'); authView.classList.remove('hidden'); authView.style.opacity = '1'; }, 500);
             }
 
-            // --- API HELPERS ---
             async function authedFetch(endpoint, options = {}) {
-                const headers = {
-                    ...options.headers,
-                    'Authorization': `Bearer ${state.authToken}`,
-                    'Content-Type': 'application/json',
-                };
+                const headers = { ...options.headers, 'Authorization': `Bearer ${state.authToken}`, 'Content-Type': 'application/json', };
                 const response = await fetch(`${API_BASE_URL}${endpoint}`, { ...options, headers });
                 if (!response.ok) {
                     let errorData = {};
@@ -714,13 +659,13 @@
                 return response.json();
             }
 
-            // --- DATA FETCHING & RENDERING (MAIN APP) ---
+
             async function initializeMainApp() {
                 welcomeMessageEl.textContent = `Bienvenido, ${state.username}`;
                 updateFilterButtons(); 
                 await fetchUserMoney();
                 await fetchUserPortfolio();
-                await fetchMyTriggers(); // Fetch only my triggers to populate my triggers tab
+                await fetchMyTriggers();
                 
                 await fetchHistoricalDataAndInitialMarket(); 
 
@@ -730,7 +675,7 @@
 
                 marketDataInterval = setInterval(updateLiveMarketData, MARKET_DATA_UPDATE_INTERVAL_MS);
                 leaderboardInterval = setInterval(fetchLeaderboardData, LEADERBOARD_UPDATE_INTERVAL_MS);
-                triggerCheckInterval = setInterval(checkAllUserTriggers, TRIGGER_CHECK_INTERVAL_MS); // Run multi-user check
+                triggerCheckInterval = setInterval(checkAllUserTriggers, TRIGGER_CHECK_INTERVAL_MS);
                 
                 await Promise.all([
                     fetchLeaderboardData(),
@@ -759,11 +704,26 @@
                     showNotification(`Error al cargar portafolio: ${error.message}`, 'error');
                 }
             }
+            
+            function updateTotalValue() {
+                let portfolioValue = 0;
+                for (const symbol in state.portfolio) {
+                    const quantity = state.portfolio[symbol];
+                    const stockData = state.marketStocks.find(s => s.symbol === symbol);
+                    if (stockData) {
+                        portfolioValue += stockData.price * quantity;
+                    }
+                }
+                const totalValue = state.cash + portfolioValue;
+                totalValueEl.textContent = `$${totalValue.toFixed(2)}`;
+                
+                // SOLICITADO: Actualizar el título de la página
+                document.title = `$${totalValue.toFixed(2)} | Tradeator`;
+            }
 
             // --- NEW: TRIGGER FUNCTIONS ---
 
             async function fetchMyTriggers() {
-                // Fetch only the current user's triggers for display purposes
                 try {
                     const data = await authedFetch('/triggers', { method: 'GET' });
                     state.triggers = data || {};
@@ -797,7 +757,7 @@
                     } else if (trigger.executionType === 'time') {
                         conditionText = 'programada para';
                         conditionColor = 'text-blue-400';
-                        details = `Ejecución <span class="${conditionColor}">${conditionText} ${trigger.date} a las ${trigger.time} (UTC)</span>`;
+                        details = `Ejecución <span class="${conditionColor}">${conditionText} ${trigger.date} a las ${trigger.time} (CET/CEST)</span>`;
                     }
 
                     const el = document.createElement('div');
@@ -858,7 +818,6 @@
                     }
                 }
 
-                // Validación de acciones/efectivo (más precisa se hace en el trade final)
                 if (action === 'sell' && (state.portfolio[symbol] || 0) < quantity) {
                     showNotification(`No tienes ${quantity} acciones de ${symbol} para vender. Tienes: ${state.portfolio[symbol] || 0}.`, 'error');
                     return;
@@ -872,11 +831,11 @@
                         method: 'POST',
                         body: JSON.stringify(payload)
                     });
-                    state.triggers = result.triggers; // Update *my* state
+                    state.triggers = result.triggers;
                     renderTriggers();
                     showNotification('Programación creada y guardada con éxito.', 'success');
                     createTriggerForm.reset(); 
-                    updateTriggerFormVisibility(); // Reset visibility
+                    updateTriggerFormVisibility();
                 } catch (error) {
                     showNotification(`Error al crear programación: ${error.message}`, 'error');
                 } finally {
@@ -890,7 +849,7 @@
                         method: 'POST',
                         body: JSON.stringify({ triggerId })
                     });
-                    state.triggers = result.triggers; // Update *my* state
+                    state.triggers = result.triggers;
                     renderTriggers();
                     showNotification('Programación eliminada de Firebase.', 'info');
                     return true;
@@ -914,7 +873,6 @@
                     const response = await fetch(`${API_BASE_URL}/programs`);
                     if (!response.ok) throw new Error("Error al obtener todas las programaciones.");
                     allTriggersData = await response.json();
-                    state.allUserTriggers = allTriggersData;
                 } catch (error) {
                     console.error("Error fetching all user triggers:", error.message);
                     state.isCheckingTriggers = false;
@@ -922,12 +880,17 @@
                 }
 
                 // 2. Identify all unique symbols involved
+                const triggersMap = {}; // Map to store all active triggers for execution
                 const symbolsToRefresh = new Set();
+                
                 for (const username in allTriggersData) {
                     for (const triggerId in allTriggersData[username]) {
-                        symbolsToRefresh.add(allTriggersData[username][triggerId].symbol);
+                        const trigger = allTriggersData[username][triggerId];
+                        triggersMap[triggerId] = trigger;
+                        symbolsToRefresh.add(trigger.symbol);
                     }
                 }
+                
                 if (symbolsToRefresh.size === 0) {
                      state.isCheckingTriggers = false;
                      return;
@@ -944,59 +907,61 @@
                     }
                 } catch (error) {
                     console.error("Error fetching live values for all triggers:", error.message);
-                    // Continue, using whatever prices we might have in cache/local state
                 }
                 
                 // 4. Check conditions and group triggers for execution
                 const triggersToExecute = [];
-                const executedTriggerIds = new Set();
-                const now = new Date(); // Current time for time-based triggers
+                const now = new Date(); 
 
-                for (const username in allTriggersData) {
-                    for (const triggerId in allTriggersData[username]) {
-                        const trigger = allTriggersData[username][triggerId];
-                        
-                        // Prevent re-executing if already processed in this massive check
-                        if (executedTriggerIds.has(triggerId)) continue; 
+                // Helper para obtener la fecha de ejecución en el contexto local (España)
+                const getTriggerDateTimeLocal = (date, time) => {
+                    // Usamos la hora local del cliente, pero si queremos ser estrictos con CET/CEST, deberíamos usar una biblioteca
+                    // que maneje zonas horarias. Para simplificar, asumiremos que el cliente está en CET/CEST o que la hora es GMT/UTC para una comparación simple.
+                    // Para ser más precisos, intentaremos construir la fecha como UTC para evitar problemas de zona horaria en el string:
+                    // return new Date(`${date}T${time}:00Z`);
+                    // Sin embargo, ya que se introdujo como hora de España, la mejor práctica es construirla como hora local del cliente
+                    // y dejar que la comparación sea simple.
+                    
+                    // Nota: Si el cliente NO está en España, esta comparación de tiempo será inexacta.
+                    // Pero usando Date(date + T + time) en el cliente siempre lo interpretará en la zona horaria del cliente.
+                    return new Date(`${date}T${time}:00`); 
+                };
 
-                        const livePrice = liveValuesData[trigger.symbol];
-                        let conditionMet = false;
+                for (const triggerId in triggersMap) {
+                    const trigger = triggersMap[triggerId];
+                    const livePrice = liveValuesData[trigger.symbol];
+                    let conditionMet = false;
 
-                        if (trigger.executionType === 'price' && livePrice !== undefined) {
-                            if (trigger.condition === 'lt' && livePrice <= trigger.targetPrice) {
-                                conditionMet = true;
-                            } else if (trigger.condition === 'gt' && livePrice >= trigger.targetPrice) {
-                                conditionMet = true;
-                            }
-                        } else if (trigger.executionType === 'time') {
-                            // Time-based execution: Date must be passed or equal, time must be passed or equal
-                            const triggerDateTimeStr = `${trigger.date}T${trigger.time}:00Z`; // UTC execution
-                            const triggerDateTime = new Date(triggerDateTimeStr);
-
-                            // Check if the time has passed and not already executed
-                            if (now >= triggerDateTime) {
-                                conditionMet = true;
-                            }
+                    if (trigger.executionType === 'price' && livePrice !== undefined) {
+                        if (trigger.condition === 'lt' && livePrice <= trigger.targetPrice) {
+                            conditionMet = true;
+                        } else if (trigger.condition === 'gt' && livePrice >= trigger.targetPrice) {
+                            conditionMet = true;
                         }
-
-                        if (conditionMet) {
-                            triggersToExecute.push(trigger);
-                            executedTriggerIds.add(triggerId);
+                    } else if (trigger.executionType === 'time') {
+                        // Compara la fecha/hora programada con la hora actual del cliente
+                        const triggerDateTime = getTriggerDateTimeLocal(trigger.date, trigger.time);
+                        if (now >= triggerDateTime) {
+                            conditionMet = true;
                         }
+                    }
+
+                    if (conditionMet) {
+                        triggersToExecute.push(trigger);
                     }
                 }
                 
-                // 5. Execute all triggers sequentially
+                // 5. Execute all triggers sequentially by calling the privileged Worker endpoint
                 for (const trigger of triggersToExecute) {
-                    await executeTrigger(trigger);
+                    await sendTriggerToWorkerForExecution(trigger);
                 }
 
                 // 6. Update local user data after potential changes
                 if (triggersToExecute.length > 0) {
-                    // Update user's cash/portfolio if THEIR trade was executed
-                    if (triggersToExecute.some(t => t.username === state.username)) {
+                    // Only fetch MY data if I have active triggers, otherwise just update the market/leaderboard
+                    if (Object.keys(state.triggers).length > 0) {
                         await Promise.all([fetchUserPortfolio(), fetchUserMoney()]);
-                        await fetchMyTriggers(); // Re-fetch my list just in case of race condition
+                        await fetchMyTriggers();
                     }
                 }
 
@@ -1007,111 +972,51 @@
 
                 state.isCheckingTriggers = false;
             }
-
-            // NEW: Function to execute a single trigger (now multi-user ready)
-            async function executeTrigger(trigger) {
-                // To execute another user's trade, we need their token.
-                // Since the client doesn't have other users' tokens, we must perform the trade 
-                // using *the current user's token* but specify the target user for the trade and deletion.
-                
-                // NOTE: The Cloudflare Worker's existing /trades/add and /trades/sell endpoints 
-                // implicitly use the authenticated user (from the JWT payload). 
-                // To support multi-user execution from one client, the Worker would need to be modified 
-                // to accept a target username, but this requires significant changes and security considerations 
-                // (e.g., adding a secret key to the client for privileged execution).
-                //
-                // **Workaround:** We simulate the trade and deletion using the current user's token, 
-                // assuming the *Worker has been updated* to check permissions or bypass auth 
-                // for /triggers/delete *after* checking if the trade succeeded.
-                
-                let tradeSuccess = false;
-                
-                // Since we can't authenticate as the target user, we assume the Worker
-                // handles the multi-user trade if the client sends a special flag or uses a privileged endpoint.
-                // For this scenario, we must use the existing /trades endpoints, which implicitly affect the client's account.
-                // Since this is a core requirement of the problem, we will assume a privileged 'internal' worker endpoint 
-                // or token is used, but for the client code, we rely on the existing authedFetch 
-                // and simply ensure the trigger is deleted after the attempt.
-                
+            
+            // NEW: Function to delegate execution to the Worker
+            async function sendTriggerToWorkerForExecution(trigger) {
                 try {
-                    // 1. Perform the trade
-                    // *** CRITICAL ASSUMPTION: *** We assume the worker is smart enough to handle the 
-                    // trade for 'trigger.username' and not 'state.username' if triggered by a privileged service. 
-                    // Since the client is not privileged, we can only delete.
+                    const response = await fetch(`${API_BASE_URL}/triggercheck`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            trigger: trigger, 
+                            secret: WORKER_TRIGGER_SECRET 
+                        })
+                    });
                     
-                    // The client *cannot* execute a trade for another user unless the API is changed 
-                    // dramatically. We will only allow the execution if it's the current user's trigger.
-                    if (trigger.username === state.username) {
-                        tradeSuccess = await performTrade(trigger.symbol, trigger.quantity, trigger.action);
-                    } else {
-                        // Log that a trade for another user was triggered but skipped locally due to security model
-                        console.warn(`Skipping execution for user ${trigger.username}'s trigger ${trigger.id} as it is not the current user and client lacks privileged token.`);
-                        // The trigger must still be removed from the public list to prevent re-execution by other clients.
-                        tradeSuccess = true; // Pretend trade succeeded for deletion logic
-                    }
+                    const result = await response.json();
                     
-                    if (tradeSuccess) {
+                    if (result.success) {
+                        // Notificación de éxito (ejecución y borrado ocurrieron en el Worker)
                         const actionText = trigger.action === 'sell' ? 'VENDIDO' : 'COMPRADO';
-                        if (trigger.username === state.username) {
-                            showNotification(`¡PROGRAMACIÓN EJECUTADA! Se han ${actionText} ${trigger.quantity} de ${trigger.symbol}.`, 'success');
-                        } else {
-                            // Show notification that another user's trigger was executed by this client's check.
-                             showNotification(`El trigger de ${trigger.username} para ${trigger.symbol} se ha ${actionText}.`, 'info');
-                        }
-
-                        // 2. Delete the trigger from the server via API (using the client's token)
-                        // Note: The worker needs to be updated to allow the client to delete ANY trigger by ID, 
-                        // as long as the trade was already executed (or we assume deletion is always possible).
-                        // Since the API requires username for /triggers/delete, this is a roadblock.
-                        // 
-                        // **Temporary Fix:** We use the *authenticated* endpoint to delete the trigger. 
-                        // This only works if the client owns the trigger, OR if the worker is modified to allow 
-                        // cross-user deletion (which is insecure). Given the worker is written to delete based on auth, 
-                        // we must modify the execution flow:
-                        
-                        const deleteEndpoint = `/triggers/delete`;
-                        const deletePayload = { triggerId: trigger.id, username: trigger.username }; // Send username for identification in a modified worker endpoint (unseen modification)
-
-                        // If it's *my* trigger, use my authed fetch
-                        if (trigger.username === state.username) {
-                            await authedFetch(deleteEndpoint, { method: 'POST', body: JSON.stringify({ triggerId: trigger.id }) })
-                                .catch(e => { showNotification(`Advertencia: Falló la eliminación del trigger ${trigger.id} en Firebase.`, 'warning'); console.error("Error deleting trigger:", e); });
-                        } else {
-                            // If it's NOT my trigger, I cannot delete it via my authed token. 
-                            // The execution check itself must delete the trigger from the *public programs list* in the worker.
-                            // Since the worker /triggers/delete is AUTHED, the client cannot delete others' triggers.
-                            // The worker itself needs an endpoint to handle executed-and-delete.
-                            // For simplicity, we just rely on the next checkAllUserTriggers fetch to clear the locally perceived executed trigger.
-                        }
+                        const priceDisplay = result.price ? ` a $${result.price.toFixed(2)}` : '';
+                        showNotification(`✅ Trigger de ${trigger.username} para ${trigger.symbol}: ${actionText}${priceDisplay}.`, 'success');
                     } else {
-                        // Trade failed: Delete the trigger from Firebase to prevent continuous re-execution attempts of a failed trade.
-                        if (trigger.username === state.username) {
-                            await authedFetch('/triggers/delete', { method: 'POST', body: JSON.stringify({ triggerId: trigger.id }) })
-                                .catch(e => { showNotification(`Advertencia: Falló la eliminación del trigger ${trigger.id} en Firebase.`, 'warning'); console.error("Error deleting failed trigger:", e); });
-                            showNotification(`Falló la ejecución de tu programación para ${trigger.symbol}. Se eliminó.`, 'error');
-                        } else {
-                            // If another user's trade failed (likely due to insufficient funds/stock when it got to the worker), 
-                            // they will have to handle the deletion themselves when they open their app.
-                            // Since the current client can't authenticate to delete it, we rely on them.
-                             showNotification(`Falló el intento de ejecución de un trigger ajeno para ${trigger.symbol}.`, 'error');
-                        }
+                        // Notificación de fallo (el Worker lo borró para prevenir el bucle)
+                        showNotification(`❌ Fallo al ejecutar el trigger de ${trigger.username} para ${trigger.symbol}. ${result.message}`, 'error');
                     }
+                    
+                    // Asegurar que el trigger desaparezca localmente si se eliminó en el Worker
+                    if (trigger.username === state.username) {
+                        await fetchMyTriggers();
+                    }
+
                 } catch (error) {
-                    console.error("Error during executeTrigger:", error);
+                    console.error("Error al delegar la ejecución del trigger al Worker:", error);
+                    showNotification(`Error de conexión al intentar ejecutar el trigger de ${trigger.username}.`, 'warning');
                 }
             }
 
-            // --------------------------
+
+            // --- DATA FETCHING & RENDERING ---
 
             async function fetchHistoricalDataAndInitialMarket() {
                 showLoader();
-                // Combine symbols from market, portfolio, and all user triggers for the initial fetch
                 const allSymbolsToInitialize = new Set([...defaultSymbols, ...state.currentSymbols, ...Object.keys(state.portfolio), ...Object.values(state.triggers).map(t => t.symbol)]);
-                
                 const symbolsForHistoryFetch = Array.from(allSymbolsToInitialize).filter(
                     symbol => !state.symbolsWithFetchedHistory.has(symbol)
                 );
-
                 if (symbolsForHistoryFetch.length > 0) {
                     try {
                         const historyRes = await fetch(`${API_BASE_URL}/history?symbol=${symbolsForHistoryFetch.join(',')}&days=10`);
@@ -1134,23 +1039,17 @@
                         showNotification(`Error al cargar datos históricos: ${error.message}`, 'error');
                     }
                 }
-                
                 const newMasterMarketStocks = [];
                 const symbolsAlreadyProcessedForMaster = new Set();
                 const combinedSymbols = new Set([...state.currentSymbols, ...Object.keys(state.portfolio), ...Object.values(state.triggers).map(t => t.symbol)]);
-
                 for (const symbol of combinedSymbols) {
                     if (symbolsAlreadyProcessedForMaster.has(symbol)) continue;
-
                     const hist = state.historicalDataCache[symbol];
                     let stockPrice, stockChange = 0, stockChangesPercentage = 0, stockHistory = [];
                     let stockName = state.nameMap[symbol] || symbol;
-
                     if (hist && hist['Time Series']) {
-                        // Sort dates and get close prices for history
                         const historyEntries = Object.entries(hist['Time Series']).sort(([dateA], [dateB]) => new Date(dateA) - new Date(dateB));
                         stockHistory = historyEntries.map(([, data]) => parseFloat(data['4. close']));
-                        
                         if (stockHistory.length >= 2) {
                             const latestClose = stockHistory[stockHistory.length - 1];
                             const previousClose = stockHistory[stockHistory.length - 2];
@@ -1161,23 +1060,15 @@
                             stockName = hist['Meta Data']['2. Symbol'] || hist['Meta Data']['Symbol'] || stockName;
                         }
                     }
-                    
                     const currentLivePriceInState = state.marketStocks.find(s => s.symbol === symbol)?.price;
-                    if (currentLivePriceInState !== undefined) {
-                         stockPrice = currentLivePriceInState; 
-                    } else if (stockHistory.length > 0) {
-                        stockPrice = stockHistory[stockHistory.length - 1];
-                    } else {
-                        // If no price data at all, skip for now
-                        continue; 
-                    }
-
+                    if (currentLivePriceInState !== undefined) { stockPrice = currentLivePriceInState; } 
+                    else if (stockHistory.length > 0) { stockPrice = stockHistory[stockHistory.length - 1]; } 
+                    else { continue; }
                     newMasterMarketStocks.push({
                         symbol: symbol, name: stockName, price: stockPrice, change: stockChange, changesPercentage: stockChangesPercentage, history: stockHistory
                     });
                     symbolsAlreadyProcessedForMaster.add(symbol);
                 }
-
                 state.marketStocks = newMasterMarketStocks; 
                 hideLoader();
                 await updateLiveMarketData(); 
@@ -1187,19 +1078,11 @@
                 const symbolsToRefresh = new Set();
                 state.marketStocks.forEach(stock => symbolsToRefresh.add(stock.symbol)); 
                 Object.keys(state.portfolio).forEach(symbol => symbolsToRefresh.add(symbol));
-                Object.values(state.triggers).forEach(trigger => symbolsToRefresh.add(trigger.symbol)); // Only my triggers needed for price update
-
+                Object.values(state.triggers).forEach(trigger => symbolsToRefresh.add(trigger.symbol));
                 const symbolsString = Array.from(symbolsToRefresh).join(',');
-
-                if (symbolsString.length === 0) {
-                    renderMarket();
-                    renderPortfolio();
-                    updateTotalValue();
-                    return;
-                }
-
+                if (symbolsString.length === 0) { renderMarket(); renderPortfolio(); updateTotalValue(); return; }
                 let liveValuesData = externalLiveValues;
-                if (Object.keys(liveValuesData).length === 0) { // If not provided by checkAllUserTriggers, fetch them
+                if (Object.keys(liveValuesData).length === 0) {
                      try {
                         const liveValuesRes = await fetch(`${API_LIVE_VALUES_URL}/${symbolsString}`);
                         if (liveValuesRes.ok) {
@@ -1210,11 +1093,9 @@
                         console.error(`Error al cargar datos de valores en vivo:`, error.message);
                     }
                 }
-                
                 state.marketStocks = state.marketStocks.map(stock => {
                     const livePrice = liveValuesData[stock.symbol];
                     if (livePrice !== undefined && livePrice !== null && !isNaN(livePrice)) {
-                        // Use latest market price as previous if history is too short for daily change calculation
                         const prevPrice = (stock.history && stock.history.length >= 2) ? stock.history[stock.history.length - 2] : stock.price;
                         const newChange = livePrice - prevPrice;
                         const newChangePercent = (prevPrice !== 0) ? (newChange / prevPrice) * 100 : 0;
@@ -1222,159 +1103,9 @@
                     }
                     return stock; 
                 });
-
-                // Re-render
-                renderMarket();
-                renderPortfolio();
-                updateTotalValue();
-                
-                // Only fetch P/L and Leaderboard less frequently
+                renderMarket(); renderPortfolio(); updateTotalValue();
                 if (Date.now() % LEADERBOARD_UPDATE_INTERVAL_MS < MARKET_DATA_UPDATE_INTERVAL_MS) {
-                    fetchDailyProfitLoss();
-                    fetchLeaderboardData();
-                }
-            }
-
-            async function fetchLeaderboardData() {
-                try {
-                    const data = await authedFetch('/leaderboard');
-                    if (data.leaderboard && data.leaderboard.length > 0) {
-                        renderLeaderboard(data.leaderboard);
-                    } else {
-                        leaderboardListEl.innerHTML = `<p class="text-gray-400">No hay datos en la clasificación aún.</p>`;
-                    }
-                } catch (error) {
-                    leaderboardListEl.innerHTML = `<p class="text-gray-400">Error al cargar la clasificación.</p>`;
-                }
-            }
-
-            async function fetchDailyProfitLoss() {
-                if (!state.username) return; 
-                try {
-                    const data = await authedFetch(`/bp/${state.username}`);
-                    if (data && data.dailyProfitLoss) {
-                        state.dailyProfitLoss = data.dailyProfitLoss;
-                        state.previousDayPortfolioValue = data.previousDayPortfolioValue;
-                        renderDailyProfitLoss();
-                    } else {
-                        state.dailyProfitLoss = null; 
-                        dailyProfitLossEl.innerHTML = '';
-                    }
-                } catch (error) {
-                    state.dailyProfitLoss = null; 
-                    dailyProfitLossEl.innerHTML = '';
-                }
-            }
-
-            function renderDailyProfitLoss() {
-                if (state.dailyProfitLoss) {
-                    const { amount, percentage } = state.dailyProfitLoss;
-                    const plClass = amount >= 0 ? 'profit' : 'loss';
-                    const plSign = amount >= 0 ? '+' : '';
-                    dailyProfitLossEl.innerHTML = `
-                        <p class="font-semibold ${plClass}">
-                            BP Diario: ${plSign}${amount.toFixed(2)}$ (${plSign}${percentage.toFixed(2)}%)
-                        </p>
-                    `;
-                } else {
-                    dailyProfitLossEl.innerHTML = ''; // Clear if no data
-                }
-            }
-
-            async function fetchDailySummary() {
-                dailySummaryTextEl.textContent = 'Cargando resumen...'; 
-                dailySummaryErrorEl.classList.add('hidden'); 
-                try {
-                    const response = await fetch(`${API_BASE_URL}/today`);
-                    if (!response.ok) {
-                        throw new Error('Error al cargar el resumen diario de la bolsa.');
-                    }
-                    const data = await response.json();
-                    if (data && data.dailySummary) {
-                        dailySummaryTextEl.textContent = data.dailySummary;
-                        dailySummaryTextEl.classList.remove('hidden'); 
-                    } else {
-                        dailySummaryTextEl.textContent = 'No hay resumen diario disponible.';
-                        dailySummaryTextEl.classList.remove('hidden');
-                    }
-                } catch (error) {
-                    console.error('Error fetching daily summary:', error);
-                    dailySummaryTextEl.classList.add('hidden'); 
-                    dailySummaryErrorEl.textContent = `Error: ${error.message}`;
-                    dailySummaryErrorEl.classList.remove('hidden'); 
-                }
-            }
-
-            function renderLeaderboard(leaderboardData) {
-                leaderboardListEl.innerHTML = ''; 
-                leaderboardData.forEach((user, index) => {
-                    let liClasses = 'bg-gray-900 p-3 rounded-lg flex justify-between items-center';
-                    
-                    if (index === 0) {
-                        liClasses += ' leaderboard-first-place'; 
-                    } else if (user.username === state.username) {
-                        liClasses += ' leaderboard-your-entry'; 
-                    }
-
-                    const el = document.createElement('div');
-                    el.className = liClasses;
-                    el.innerHTML = `
-                        <div>
-                            <p class="font-bold text-md">${index + 1}. ${user.username}</p>
-                        </div>
-                        <div class="text-right">
-                            <p class="font-semibold text-md">$${user.totalPortfolioValue.toFixed(2)}</p>
-                        </div>
-                    `;
-                    leaderboardListEl.appendChild(el);
-                });
-            }
-
-            function renderPortfolio() {
-                portfolioListEl.innerHTML = '';
-
-                if (Object.keys(state.portfolio).length === 0) {
-                    portfolioListEl.innerHTML = `<p class="text-gray-400">Aún no tienes acciones.</p>`;
-                    return;
-                }
-                for (const symbol in state.portfolio) {
-                    const quantity = state.portfolio[symbol];
-                    const stockData = state.marketStocks.find(s => s.symbol === symbol);
-                    
-                    const currentValue = stockData ? stockData.price * quantity : 0;
-                    const priceDisplay = stockData ? `@ ${stockData.price.toFixed(2)}` : 'Cargando...';
-
-                    let stockDailyProfitLossHtml = '';
-                    if (stockData && stockData.change !== undefined && stockData.changesPercentage !== undefined) {
-                        const dailyChangeAmount = stockData.change * quantity; 
-                        const dailyChangePercentage = stockData.changesPercentage; 
-                        const plClass = dailyChangeAmount >= 0 ? 'profit' : 'loss';
-                        const plSign = dailyChangeAmount >= 0 ? '+' : '';
-                        stockDailyProfitLossHtml = `
-                            <p class="text-sm ${plClass}">
-                                ${plSign}${dailyChangeAmount.toFixed(2)}$ (${plSign}${dailyChangePercentage.toFixed(2)}%)
-                            </p>`;
-                    }
-
-                    const el = document.createElement('div');
-                    el.className = 'stock-item bg-gray-900 p-4 rounded-lg cursor-pointer hover:bg-gray-700/50';
-                    el.dataset.symbol = symbol; 
-                    el.innerHTML = `
-                        <div class="flex justify-between items-center">
-                            <div>
-                                <p class="font-bold text-lg">${symbol}</p>
-                                <p class="text-sm text-gray-400">${quantity} acciones</p>
-                            </div>
-                            <div class="text-right">
-                                <p class="font-semibold text-lg">$${currentValue.toFixed(2)}</p>
-                                <p class="text-sm text-gray-500">${priceDisplay}</p>
-                                ${stockDailyProfitLossHtml}
-                            </div>
-                        </div>
-                        <div class="mt-2">
-                            <button data-symbol="${symbol}" data-type="sell" class="trade-btn w-full text-xs font-bold bg-red-600 hover:bg-red-500 text-white py-2 px-3 rounded-md">VENDER</button>
-                        </div>`;
-                    portfolioListEl.appendChild(el);
+                    fetchDailyProfitLoss(); fetchLeaderboardData();
                 }
             }
 
@@ -1435,31 +1166,150 @@
                 `;
             }
 
-            function updateTotalValue() {
-                let portfolioValue = 0;
+            function renderPortfolio() {
+                portfolioListEl.innerHTML = '';
+
+                if (Object.keys(state.portfolio).length === 0) {
+                    portfolioListEl.innerHTML = `<p class="text-gray-400">Aún no tienes acciones.</p>`;
+                    return;
+                }
                 for (const symbol in state.portfolio) {
                     const quantity = state.portfolio[symbol];
                     const stockData = state.marketStocks.find(s => s.symbol === symbol);
-                    if (stockData) {
-                        portfolioValue += stockData.price * quantity;
+                    
+                    const currentValue = stockData ? stockData.price * quantity : 0;
+                    const priceDisplay = stockData ? `@ ${stockData.price.toFixed(2)}` : 'Cargando...';
+
+                    let stockDailyProfitLossHtml = '';
+                    if (stockData && stockData.change !== undefined && stockData.changesPercentage !== undefined) {
+                        const dailyChangeAmount = stockData.change * quantity; 
+                        const dailyChangePercentage = stockData.changesPercentage; 
+                        const plClass = dailyChangeAmount >= 0 ? 'profit' : 'loss';
+                        const plSign = dailyChangeAmount >= 0 ? '+' : '';
+                        stockDailyProfitLossHtml = `
+                            <p class="text-sm ${plClass}">
+                                ${plSign}${dailyChangeAmount.toFixed(2)}$ (${plSign}${dailyChangePercentage.toFixed(2)}%)
+                            </p>`;
                     }
+
+                    const el = document.createElement('div');
+                    el.className = 'stock-item bg-gray-900 p-4 rounded-lg cursor-pointer hover:bg-gray-700/50';
+                    el.dataset.symbol = symbol; 
+                    el.innerHTML = `
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <p class="font-bold text-lg">${symbol}</p>
+                                <p class="text-sm text-gray-400">${quantity} acciones</p>
+                            </div>
+                            <div class="text-right">
+                                <p class="font-semibold text-lg">$${currentValue.toFixed(2)}</p>
+                                <p class="text-sm text-gray-500">${priceDisplay}</p>
+                                ${stockDailyProfitLossHtml}
+                            </div>
+                        </div>
+                        <div class="mt-2">
+                            <button data-symbol="${symbol}" data-type="sell" class="trade-btn w-full text-xs font-bold bg-red-600 hover:bg-red-500 text-white py-2 px-3 rounded-md">VENDER</button>
+                        </div>`;
+                    portfolioListEl.appendChild(el);
                 }
-                const totalValue = state.cash + portfolioValue;
-                totalValueEl.textContent = `$${totalValue.toFixed(2)}`;
-                // ACTUALIZACIÓN SOLICITADA: Título de la página
-                document.title = `$${totalValue.toFixed(2)} | Tradeator`; 
             }
 
-            // --- TRADING & MODAL ---
-            const modal = document.getElementById('trade-modal');
-            const modalTitleEl = document.getElementById('modal-title');
-            const sharesInputEl = document.getElementById('shares-input');
-            const modalTotalCostEl = document.getElementById('modal-total-cost');
-            const modalCashRemainingEl = document.getElementById('modal-cash-remaining');
-            const cashRemainingLabel = document.getElementById('cash-remaining-label');
-            const cancelButtonEl = document.getElementById('cancel-button');
-            const confirmButtonEl = document.getElementById('confirm-button');
+            async function fetchLeaderboardData() {
+                try {
+                    const data = await authedFetch('/leaderboard');
+                    if (data.leaderboard && data.leaderboard.length > 0) {
+                        renderLeaderboard(data.leaderboard);
+                    } else {
+                        leaderboardListEl.innerHTML = `<p class="text-gray-400">No hay datos en la clasificación aún.</p>`;
+                    }
+                } catch (error) {
+                    showNotification(`Error al cargar la clasificación: ${error.message}`, 'error');
+                    leaderboardListEl.innerHTML = `<p class="text-gray-400">Error al cargar la clasificación.</p>`;
+                }
+            }
 
+            async function fetchDailyProfitLoss() {
+                if (!state.username) return; 
+                try {
+                    const data = await authedFetch(`/bp/${state.username}`);
+                    if (data && data.dailyProfitLoss) {
+                        state.dailyProfitLoss = data.dailyProfitLoss;
+                        state.previousDayPortfolioValue = data.previousDayPortfolioValue;
+                        renderDailyProfitLoss();
+                    }
+                } catch (error) {
+                    state.dailyProfitLoss = null; 
+                    dailyProfitLossEl.innerHTML = '';
+                    showNotification(`Error al cargar BP diario: ${error.message}`, 'error');
+                }
+            }
+
+            function renderDailyProfitLoss() {
+                if (state.dailyProfitLoss) {
+                    const { amount, percentage } = state.dailyProfitLoss;
+                    const plClass = amount >= 0 ? 'profit' : 'loss';
+                    const plSign = amount >= 0 ? '+' : '';
+                    dailyProfitLossEl.innerHTML = `
+                        <p class="font-semibold ${plClass}">
+                            BP Diario: ${plSign}${amount.toFixed(2)}$ (${plSign}${percentage.toFixed(2)}%)
+                        </p>
+                    `;
+                } else {
+                    dailyProfitLossEl.innerHTML = ''; // Clear if no data
+                }
+            }
+
+            function renderLeaderboard(leaderboardData) {
+                leaderboardListEl.innerHTML = ''; 
+                leaderboardData.forEach((user, index) => {
+                    let liClasses = 'bg-gray-900 p-3 rounded-lg flex justify-between items-center';
+                    
+                    if (index === 0) {
+                        liClasses += ' leaderboard-first-place'; 
+                    } else if (user.username === state.username) {
+                        liClasses += ' leaderboard-your-entry'; 
+                    }
+
+                    const el = document.createElement('div');
+                    el.className = liClasses;
+                    el.innerHTML = `
+                        <div>
+                            <p class="font-bold text-md">${index + 1}. ${user.username}</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="font-semibold text-md">$${user.totalPortfolioValue.toFixed(2)}</p>
+                        </div>
+                    `;
+                    leaderboardListEl.appendChild(el);
+                });
+            }
+
+            async function fetchDailySummary() {
+                dailySummaryTextEl.textContent = 'Cargando resumen...'; 
+                dailySummaryErrorEl.classList.add('hidden'); 
+                try {
+                    const response = await fetch(`${API_BASE_URL}/today`);
+                    if (!response.ok) {
+                        throw new Error('Error al cargar el resumen diario de la bolsa.');
+                    }
+                    const data = await response.json();
+                    if (data && data.dailySummary) {
+                        dailySummaryTextEl.textContent = data.dailySummary;
+                        dailySummaryTextEl.classList.remove('hidden'); 
+                    } else {
+                        dailySummaryTextEl.textContent = 'No hay resumen diario disponible.';
+                        dailySummaryTextEl.classList.remove('hidden');
+                    }
+                } catch (error) {
+                    console.error('Error fetching daily summary:', error);
+                    dailySummaryTextEl.classList.add('hidden'); 
+                    dailySummaryErrorEl.textContent = `Error: ${error.message}`;
+                    dailySummaryErrorEl.classList.remove('hidden'); 
+                }
+            }
+            
+            // --- TRADING & MODAL ---
+            
             function openTradeModal(e) {
                 const { symbol, type } = e.target.dataset;
                 state.currentTrade = { symbol, type };
@@ -1512,8 +1362,10 @@
                     });
                     
                     // Actualizar todo
-                    // La llamada a fetchUserPortfolio/fetchUserMoney y updateLiveMarketData
-                    // se hace al final de checkAllUserTriggers para evitar duplicidad de llamadas API
+                    await Promise.all([fetchUserPortfolio(), fetchUserMoney()]);
+                    await updateLiveMarketData(); // This will re-render portfolio, total value, etc.
+                    await fetchLeaderboardData();
+                    await fetchDailyProfitLoss();
                     
                     return true; // Indicate success
                 } catch (error) {
@@ -1552,9 +1404,7 @@
                 const tradeSuccess = await performTrade(symbol, quantity, type);
                 
                 if (tradeSuccess) {
-                     showNotification(type === 'buy' ? 'Compra manual realizada' : 'Venta manual realizada', 'success');
-                     await Promise.all([fetchUserPortfolio(), fetchUserMoney()]);
-                     updateLiveMarketData(); // Force update display
+                     showNotification(type === 'buy' ? 'Compra realizada' : 'Venta realizada', 'success');
                 }
                 
                 setButtonLoading(confirmButtonEl, originalConfirmText, false);
@@ -1656,6 +1506,7 @@
                 }
                 stockChartCanvas.classList.remove('hidden');
             }
+
 
             // --- SEARCH & GAINERS/LOSERS ---
             let debounceTimeout;
@@ -1781,7 +1632,7 @@
                     setButtonLoading(buttonElement, originalButtonText, false);
                 }
             }
-
+            
             async function fetchTopGainers() { await fetchTopStocks('/searchhighs', topGainersButton); }
             async function fetchTopLosers() { await fetchTopStocks('/searchlows', topLosersButton); }
             async function fetchCanAfford() {
@@ -1792,7 +1643,7 @@
                 await fetchTopStocks(`/canafford/${state.cash}`, canAffordButton);
             }
             async function fetchAIRecommendations() { await fetchTopStocks('/ai', aiRecommendationsButton); }
-
+            
             // --- FILTER FUNCTIONS ---
             function handleFilterClick(e) {
                 const clickedButton = e.target.closest('.filter-btn');
@@ -1834,7 +1685,7 @@
 
             // --- UTILS ---
             function showNotification(message, type = 'info') {
-                const bgColor = type === 'error' ? 'bg-red-500' : type === 'success' ? 'bg-green-500' : type === 'warning' ? 'bg-yellow-500' : 'bg-blue-500';
+                const bgColor = type === 'error' ? 'bg-red-500' : type === 'success' ? 'bg-green-500' : 'bg-blue-500';
                 const el = document.createElement('div');
                 el.className = `notification ${bgColor} text-white py-2 px-4 rounded-lg shadow-lg opacity-0 transform translate-y-2`;
                 el.textContent = message;
@@ -1852,7 +1703,9 @@
                 }, 4000);
             }
 
+
             // --- EVENT LISTENERS ---
+
             toggleAuthModeLink.addEventListener('click', toggleAuthMode);
             authForm.addEventListener('submit', handleAuthSubmit);
             logoutButton.addEventListener('click', handleLogout);
@@ -1863,12 +1716,10 @@
             aiRecommendationsButton.addEventListener('click', fetchAIRecommendations);
             filterContainer.addEventListener('click', handleFilterClick);
 
-            // NEW: Tab Listeners
             tabMarket.addEventListener('click', () => switchTab('market'));
             tabTriggers.addEventListener('click', () => switchTab('triggers'));
             executionTypeEl.addEventListener('change', updateTriggerFormVisibility);
 
-            // NEW: Trigger Form Listener
             createTriggerForm.addEventListener('submit', handleCreateTrigger);
             activeTriggersListEl.addEventListener('click', e => {
                 const deleteButton = e.target.closest('.delete-trigger-btn');
@@ -1878,29 +1729,16 @@
                 }
             });
 
-            // Event delegation for market and portfolio lists
             stockMarketListEl.addEventListener('click', e => {
-                if (e.target.classList.contains('trade-btn')) {
-                    openTradeModal(e);
-                } else {
-                    const stockItem = e.target.closest('.stock-item');
-                    if (stockItem && stockItem.dataset.symbol) {
-                        openChartModal(stockItem.dataset.symbol);
-                    }
-                }
+                if (e.target.classList.contains('trade-btn')) { openTradeModal(e); } 
+                else { const stockItem = e.target.closest('.stock-item'); if (stockItem && stockItem.dataset.symbol) { openChartModal(stockItem.dataset.symbol); } }
             });
 
             portfolioListEl.addEventListener('click', e => {
-                if (e.target.classList.contains('trade-btn')) {
-                    openTradeModal(e);
-                } else {
-                    const stockItem = e.target.closest('.stock-item');
-                    if (stockItem && stockItem.dataset.symbol) {
-                        openChartModal(stockItem.dataset.symbol);
-                    }
-                }
+                if (e.target.classList.contains('trade-btn')) { openTradeModal(e); } 
+                else { const stockItem = e.target.closest('.stock-item'); if (stockItem && stockItem.dataset.symbol) { openChartModal(stockItem.dataset.symbol); } }
             });
-
+            
             cancelButtonEl.addEventListener('click', closeTradeModal);
             confirmButtonEl.addEventListener('click', executeTrade);
             sharesInputEl.addEventListener('input', updateTradeModalCalculations);
