@@ -188,8 +188,16 @@
                     <h1 class="text-3xl md:text-4xl font-bold text-white">Tradeator</h1>
                     <p id="welcome-message" class="text-gray-400">Bienvenido, ...</p>
                 </div>
+                <!-- REESTRUCTURACIÓN: Agrupación de contador y valor -->
                 <div class="flex items-center space-x-4 mt-4 md:mt-0">
-                    <div class="text-center md:text-right bg-gray-800 p-4 rounded-lg shadow-lg">
+                    <!-- NEW: NASDAQ Market Timer (Columna izquierda del boceto) -->
+                    <div class="w-48 text-center bg-gray-800 p-4 rounded-lg shadow-lg">
+                        <h2 id="timer-status" class="text-lg font-semibold text-gray-400">🟠 Nasdaq: Cargando...</h2>
+                        <p id="timer-display" class="text-4xl font-bold text-orange-500 mt-1">--</p>
+                    </div>
+
+                    <!-- Valor Total del Portafolio (Columna derecha del boceto) -->
+                    <div class="w-48 text-center bg-gray-800 p-4 rounded-lg shadow-lg">
                         <h2 class="text-lg font-semibold text-gray-400">Valor Total del Portafolio</h2>
                         <p id="total-value" class="text-3xl font-bold text-white">$1,000.00</p>
                         <!-- Daily Profit/Loss Section -->
@@ -452,6 +460,7 @@
             let marketDataInterval = null;
             let leaderboardInterval = null;
             let triggerCheckInterval = null; // NEW: Interval for checking triggers
+            let marketTimerInterval = null; // NEW: Interval for market timer
             let currentChartInstance = null; // To hold the Chart.js instance for destruction
             const MARKET_DATA_UPDATE_INTERVAL_MS = 3000; // Update market prices every 3 seconds
             const LEADERBOARD_UPDATE_INTERVAL_MS = 10000; // Update leaderboard every 10 seconds
@@ -524,6 +533,10 @@
             const cashRemainingLabel = document.getElementById('cash-remaining-label');
             const cancelButtonEl = document.getElementById('cancel-button');
             const confirmButtonEl = document.getElementById('confirm-button');
+            
+            // NEW: Market Timer Elements
+            const timerStatusEl = document.getElementById('timer-status');
+            const timerDisplayEl = document.getElementById('timer-display');
 
 
             // --- LOADER FUNCTIONS ---
@@ -638,7 +651,8 @@
                 if (marketDataInterval) clearInterval(marketDataInterval);
                 if (leaderboardInterval) clearInterval(leaderboardInterval);
                 if (triggerCheckInterval) clearInterval(triggerCheckInterval);
-                marketDataInterval = null; leaderboardInterval = null; triggerCheckInterval = null;
+                if (marketTimerInterval) clearInterval(marketTimerInterval); // NEW: Clear timer interval
+                marketDataInterval = null; leaderboardInterval = null; triggerCheckInterval = null; marketTimerInterval = null;
                 if (currentChartInstance) { currentChartInstance.destroy(); currentChartInstance = null; }
                 localStorage.removeItem('stock_simulator_username'); localStorage.removeItem('stock_simulator_password');
                 state.authToken = null; state.username = null; state.portfolio = {}; state.cash = 0; state.historicalDataCache = {};
@@ -672,10 +686,15 @@
                 if (marketDataInterval) clearInterval(marketDataInterval);
                 if (leaderboardInterval) clearInterval(leaderboardInterval);
                 if (triggerCheckInterval) clearInterval(triggerCheckInterval); 
+                if (marketTimerInterval) clearInterval(marketTimerInterval); // NEW: Clear existing timer
 
                 marketDataInterval = setInterval(updateLiveMarketData, MARKET_DATA_UPDATE_INTERVAL_MS);
                 leaderboardInterval = setInterval(fetchLeaderboardData, LEADERBOARD_UPDATE_INTERVAL_MS);
                 triggerCheckInterval = setInterval(checkAllUserTriggers, TRIGGER_CHECK_INTERVAL_MS);
+                marketTimerInterval = setInterval(updateMarketTimerDisplay, 1000); // NEW: Start market timer
+
+                // Run initial display update
+                updateMarketTimerDisplay();
                 
                 await Promise.all([
                     fetchLeaderboardData(),
@@ -722,6 +741,103 @@
                 // SOLICITADO: Actualizar el título de la página
                 document.title = `$${totalValue.toFixed(2)} | Tradeator`;
             }
+            
+            // --- NEW: MARKET TIMER FUNCTIONS (Updated to match the schema design) ---
+
+            // Función para obtener la hora actual de Nueva York como objeto Date local
+            function getNewYorkTime() {
+                try {
+                    const nyTimeString = new Date().toLocaleString("en-US", { timeZone: "America/New_York" });
+                    return new Date(nyTimeString);
+                } catch (e) {
+                    console.error("Error al obtener hora de NY, usando fallback:", e);
+                    // Fallback to local time if New York time zone conversion fails
+                    return new Date(); 
+                }
+            }
+
+            function calculateMarketTime() {
+                const nowNY = getNewYorkTime();
+                const currentDay = nowNY.getDay(); // 0=Sun, 6=Sat
+
+                const NASDAQ_OPEN_HOUR = 9;
+                const NASDAQ_OPEN_MINUTE = 30;
+                const NASDAQ_CLOSE_HOUR = 16; // 4 PM
+
+                let nextOpen = new Date(nowNY);
+                let nextClose = new Date(nowNY);
+                
+                // 1. Determinar base market times para hoy (NY Time)
+                nextOpen.setHours(NASDAQ_OPEN_HOUR, NASDAQ_OPEN_MINUTE, 0, 0);
+                nextClose.setHours(NASDAQ_CLOSE_HOUR, 0, 0, 0);
+
+                let statusText = 'Cerrado';
+                let targetTime = null;
+
+                // 2. Check if it's a weekend (Sat=6, Sun=0)
+                if (currentDay === 0 || currentDay === 6) {
+                    // Set target to Monday's open
+                    nextOpen.setDate(nextOpen.getDate() + (currentDay === 0 ? 1 : 2));
+                    statusText = 'Apertura del NASDAQ';
+                    targetTime = nextOpen;
+                } else {
+                    // It's a weekday
+                    const nowMinutes = nowNY.getHours() * 60 + nowNY.getMinutes();
+                    const openMinutes = NASDAQ_OPEN_HOUR * 60 + NASDAQ_OPEN_MINUTE;
+                    const closeMinutes = NASDAQ_CLOSE_HOUR * 60;
+
+                    if (nowMinutes < openMinutes) {
+                        // Pre-market: Waiting for Open
+                        statusText = 'Apertura del NASDAQ';
+                        targetTime = nextOpen;
+                    } else if (nowMinutes >= openMinutes && nowMinutes < closeMinutes) {
+                        // Market is Open: Waiting for Close
+                        statusText = 'Cierre del NASDAQ';
+                        targetTime = nextClose;
+                    } else {
+                        // After-hours: Waiting for next day Open
+                        statusText = 'Apertura del NASDAQ';
+                        
+                        // Check if today is Friday, if so, next open is Monday
+                        if (currentDay === 5) {
+                            nextOpen.setDate(nextOpen.getDate() + 3); // 3 days for Mon
+                        } else {
+                            nextOpen.setDate(nextOpen.getDate() + 1); // 1 day for next weekday
+                        }
+                        // Recalculate next open time
+                        nextOpen.setHours(NASDAQ_OPEN_HOUR, NASDAQ_OPEN_MINUTE, 0, 0);
+                        targetTime = nextOpen;
+                    }
+                }
+
+                // Calculate remaining time (in milliseconds)
+                const remainingMs = targetTime ? targetTime.getTime() - nowNY.getTime() : 0;
+                
+                const totalSeconds = Math.max(0, Math.floor(remainingMs / 1000));
+                const hours = Math.floor(totalSeconds / 3600);
+                const minutes = Math.floor((totalSeconds % 3600) / 60);
+                const seconds = totalSeconds % 60;
+
+                const remainingTimeHms = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+
+                return { statusText, remainingTimeHms, totalSeconds };
+            }
+
+            function updateMarketTimerDisplay() {
+                const { statusText, remainingTimeHms } = calculateMarketTime();
+
+                // Update Status (e.g., Cierre del NASDAQ or Apertura del NASDAQ)
+                // Use innerHTML to include the orange clock emoji (U+1F551) for the timer.
+                timerStatusEl.textContent = statusText;
+
+                // Update Display (e.g., 02:12:25)
+                timerDisplayEl.innerHTML = `
+                    <span class="text-orange-500">${remainingTimeHms}</span>
+                `;
+            }
+            
+            // --- END NEW MARKET TIMER FUNCTIONS ---
+
 
             // --- NEW: TRIGGER FUNCTIONS ---
 
@@ -920,15 +1036,7 @@
 
                 // Helper para obtener la fecha de ejecución en el contexto local (España)
                 const getTriggerDateTimeLocal = (date, time) => {
-                    // Usamos la hora local del cliente, pero si queremos ser estrictos con CET/CEST, deberíamos usar una biblioteca
-                    // que maneje zonas horarias. Para simplificar, asumiremos que el cliente está en CET/CEST o que la hora es GMT/UTC para una comparación simple.
-                    // Para ser más precisos, intentaremos construir la fecha como UTC para evitar problemas de zona horaria en el string:
-                    // return new Date(`${date}T${time}:00Z`);
-                    // Sin embargo, ya que se introdujo como hora de España, la mejor práctica es construirla como hora local del cliente
-                    // y dejar que la comparación sea simple.
-                    
-                    // Nota: Si el cliente NO está en España, esta comparación de tiempo será inexacta.
-                    // Pero usando Date(date + T + time) en el cliente siempre lo interpretará en la zona horaria del cliente.
+                    // Usamos la hora local del cliente
                     return new Date(`${date}T${time}:00`); 
                 };
 
