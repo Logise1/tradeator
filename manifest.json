@@ -1,0 +1,21 @@
+    {
+      "name": "Tradeator",
+      "short_name": "Tradeator",
+      "description": "Tu plataforma de simulación de trading",
+      "start_url": "/trading",
+      "display": "standalone",
+      "background_color": "#111827",
+      "theme_color": "#111827",
+      "icons": [
+        {
+          "src": "https://weberia.neocities.org/stock.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        },
+        {
+          "src": "https://weberia.neocities.org/stock.png",
+          "sizes": "512x512",
+          "type": "image/png"
+        }
+      ]
+    }

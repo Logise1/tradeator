@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tradeator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --color-primary: #111827;
+            --color-secondary: #1f2937;
+            --color-accent-start: #10b981;
+            --color-accent-end: #06b6d4;
+            --text-primary: #f9fafb;
+            --text-secondary: #9ca3af;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--color-primary);
+            color: var(--text-primary);
+        }
+
+        .hero-section {
+            position: relative;
+            overflow: hidden;
+        }
+
+        #heroVideo {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            min-width: 100%;
+            min-height: 100%;
+            width: auto;
+            height: auto;
+            z-index: -2;
+            transform: translateX(-50%) translateY(-50%);
+            background-size: cover;
+        }
+
+        .hero-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(17, 24, 39, 0.75);
+            z-index: -1;
+        }
+        
+        .text-gradient {
+            background: linear-gradient(90deg, var(--color-accent-start), var(--color-accent-end));
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .cta-button {
+            position: relative;
+            background: linear-gradient(90deg, var(--color-accent-start), var(--color-accent-end));
+            transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+            box-shadow: 0 4px 15px rgba(6, 182, 212, 0.2), 0 2px 5px rgba(16, 185, 129, 0.2);
+        }
+        .cta-button:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(6, 182, 212, 0.4), 0 5px 10px rgba(16, 185, 129, 0.4);
+        }
+
+        .glass-card {
+            background-color: rgba(31, 41, 55, 0.4);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.4s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .glass-card:before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: radial-gradient(circle at var(--x, 50%) var(--y, 50%), rgba(255, 255, 255, 0.1), transparent 40%);
+            opacity: 0;
+            transition: opacity 0.5s;
+        }
+        
+        .glass-card:hover:before {
+            opacity: 1;
+        }
+
+        .glass-card:hover {
+            transform: translateY(-10px);
+            border-color: rgba(6, 182, 212, 0.5);
+        }
+        
+        /* Scroll Animations */
+        .scroll-animate {
+            opacity: 0;
+            transform: translateY(30px);
+            transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+        }
+        .scroll-animate.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-200">
+
+    <!-- Header -->
+    <header class="absolute top-0 left-0 right-0 z-20 p-4 bg-transparent">
+        <div class="container mx-auto flex justify-between items-center">
+            <h1 class="text-3xl font-bold text-white">Trade<span class="text-gradient">ator</span></h1>
+            <nav class="hidden md:flex space-x-8 items-center text-lg">
+                <a href="#features" class="hover:text-cyan-400 transition-colors duration-300">Características</a>
+                <a href="#testimonials" class="hover:text-cyan-400 transition-colors duration-300">Testimonios</a>
+                <a href="/trading" class="bg-gray-700/50 hover:bg-gray-600/50 text-white font-semibold py-2 px-5 rounded-lg transition-colors border border-gray-600">
+                    Iniciar Sesión
+                </a>
+            </nav>
+            <div class="md:hidden">
+                <!-- Mobile menu button -->
+                <button class="text-white">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7" />
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Hero Section -->
+    <main>
+        <section class="hero-section min-h-screen flex items-center justify-center text-center px-4 pt-20">
+            <video autoplay muted loop playsinline id="heroVideo">
+                <source src="vid.mp4" type="video/mp4">
+                Tu navegador no soporta vídeos HTML5.
+            </video>
+            <div class="hero-overlay"></div>
+            <div class="container mx-auto z-10 relative">
+                <h2 class="text-4xl md:text-6xl font-black text-white leading-tight mb-4">
+                    Domina el Arte de Invertir <br class="hidden md:block"> <span class="text-gradient">Sin Arriesgar tu Dinero</span>
+                </h2>
+                <p class="text-lg md:text-xl text-gray-300 max-w-3xl mx-auto mb-8">
+                    Tradeator es el simulador definitivo que te prepara para el mundo real de la bolsa. Aprende, practica y conviértete en un inversor experto.
+                </p>
+                <a href="/trading" class="cta-button inline-block text-white font-bold text-lg py-4 px-10 rounded-lg">
+                    Empezar Ahora
+                </a>
+                <p class="mt-4 text-sm text-gray-500">Gratis · No se requiere tarjeta de crédito</p>
+            </div>
+        </section>
+    </main>
+
+    <!-- Features Section -->
+    <section id="features" class="py-24 bg-primary">
+        <div class="container mx-auto px-4">
+            <div class="text-center mb-16 scroll-animate">
+                <h3 class="text-4xl md:text-5xl font-bold text-white">¿Por qué <span class="text-gradient">Tradeator</span>?</h3>
+                <p class="text-gray-400 mt-3 text-lg">Las herramientas que usan los profesionales, a tu alcance.</p>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <!-- Feature 1 -->
+                <div class="glass-card p-8 rounded-2xl text-center scroll-animate" style="transition-delay: 100ms;">
+                    <div class="mb-5 inline-block p-4 bg-gray-800 rounded-full">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h2"/><path d="M20 12h2"/><path d="m18.36 5.64.14.14"/><path d="m6 6 .14-.14"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m6.34 17.66-.14.14"/><path d="m18.5 18.5-.14-.14"/><path d="M12 18a6 6 0 1 0 0-12 6 6 0 0 0 0 12Z"/><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/></svg>
+                    </div>
+                    <h4 class="text-2xl font-bold text-white mb-2">Datos en Tiempo Real</h4>
+                    <p class="text-gray-400">Opera con precios de acciones y activos reales de los mercados más importantes del mundo.</p>
+                </div>
+                <!-- Feature 2 -->
+                <div class="glass-card p-8 rounded-2xl text-center scroll-animate" style="transition-delay: 200ms;">
+                    <div class="mb-5 inline-block p-4 bg-gray-800 rounded-full">
+                         <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                    </div>
+                    <h4 class="text-2xl font-bold text-white mb-2">Riesgo Cero</h4>
+                    <p class="text-gray-400">Experimenta con estrategias de inversión y aprende de tus errores sin arriesgar ni un céntimo.</p>
+                </div>
+                <!-- Feature 3 -->
+                <div class="glass-card p-8 rounded-2xl text-center scroll-animate" style="transition-delay: 300ms;">
+                    <div class="mb-5 inline-block p-4 bg-gray-800 rounded-full">
+                         <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+                    </div>
+                    <h4 class="text-2xl font-bold text-white mb-2">Análisis Profesional</h4>
+                    <p class="text-gray-400">Utiliza indicadores técnicos y gráficos avanzados para tomar decisiones informadas, como en una plataforma real.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Testimonials Section -->
+    <section id="testimonials" class="py-24" style="background: var(--color-secondary);">
+        <div class="container mx-auto px-4">
+            <div class="text-center mb-16 scroll-animate">
+                <h3 class="text-4xl md:text-5xl font-bold text-white">La voz de la <span class="text-gradient">Comunidad</span></h3>
+                <p class="text-gray-400 mt-3 text-lg">Historias de éxito de nuestros traders.</p>
+            </div>
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <!-- Testimonial 1 -->
+                <div class="glass-card p-8 rounded-2xl flex flex-col scroll-animate" style="transition-delay: 100ms;">
+                    <p class="text-gray-300 text-lg flex-grow leading-relaxed">"Tradeator cambió mi forma de ver la inversión. Pude probar mis teorías sin miedo a perder. ¡Cuando empecé a invertir de verdad ya tenía la confianza que necesitaba!"</p>
+                    <div class="mt-6 flex items-center">
+                        <img src="https://placehold.co/50x50/10b981/f9fafb?text=CA" class="rounded-full" alt="Foto de usuario">
+                        <div class="ml-4">
+                            <p class="font-bold text-white text-lg">Carlos Álvarez</p>
+                            <p class="text-sm text-gray-400">Inversor Principiante</p>
+                        </div>
+                    </div>
+                </div>
+                <!-- Testimonial 2 -->
+                <div class="glass-card p-8 rounded-2xl flex flex-col scroll-animate" style="transition-delay: 200ms;">
+                    <p class="text-gray-300 text-lg flex-grow leading-relaxed">"La mejor herramienta educativa. Los datos en tiempo real son clave, es como operar en el mercado real pero con una red de seguridad. Lo recomiendo a todos mis alumnos."</p>
+                    <div class="mt-6 flex items-center">
+                        <img src="https://placehold.co/50x50/06b6d4/f9fafb?text=LS" class="rounded-full" alt="Foto de usuario">
+                        <div class="ml-4">
+                            <p class="font-bold text-white text-lg">Laura Sánchez</p>
+                            <p class="text-sm text-gray-400">Profesora de Finanzas</p>
+                        </div>
+                    </div>
+                </div>
+                <!-- Testimonial 3 -->
+                <div class="glass-card p-8 rounded-2xl flex flex-col scroll-animate" style="transition-delay: 300ms;">
+                    <p class="text-gray-300 text-lg flex-grow leading-relaxed">"La plataforma es increíblemente intuitiva. Las herramientas de análisis me han permitido entender los indicadores que usan los profesionales. ¡Es la práctica perfecta!"</p>
+                    <div class="mt-6 flex items-center">
+                        <img src="https://placehold.co/50x50/6366f1/f9fafb?text=AG" class="rounded-full" alt="Foto de usuario">
+                        <div class="ml-4">
+                            <p class="font-bold text-white text-lg">Ana García</p>
+                            <p class="text-sm text-gray-400">Day Trader en Formación</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="py-24 bg-primary">
+        <div class="container mx-auto px-4 text-center scroll-animate">
+             <h3 class="text-4xl md:text-5xl font-bold text-white">¿Listo para ser un <span class="text-gradient">Tradeator</span>?</h3>
+             <p class="text-gray-400 mt-4 mb-10 max-w-2xl mx-auto text-lg">Únete a miles de usuarios que ya están construyendo su futuro financiero. Tu viaje como inversor empieza aquí y ahora.</p>
+             <a href="/trading" class="cta-button inline-block text-white font-bold text-xl py-4 px-12 rounded-lg">
+                Crea tu Cuenta Gratis
+            </a>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-secondary border-t border-gray-800">
+        <div class="container mx-auto py-8 px-4 flex flex-col md:flex-row justify-between items-center text-center md:text-left">
+            <p class="text-gray-500">&copy; 2025 tradeator.es. Todos los derechos reservados.</p>
+            <div class="mt-4 md:mt-0 flex space-x-6">
+                <a href="#" class="text-gray-400 hover:text-white transition-colors">Términos</a>
+                <a href="#" class="text-gray-400 hover:text-white transition-colors">Privacidad</a>
+                <a href="#" class="text-gray-400 hover:text-white transition-colors">Contacto</a>
+            </div>
+        </div>
+    </footer>
+    
+    <script>
+        // JS for scroll animations
+        const animatedElements = document.querySelectorAll('.scroll-animate');
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                }
+            });
+        }, {
+            threshold: 0.1
+        });
+
+        animatedElements.forEach(el => observer.observe(el));
+        
+        // JS for glass card hover effect
+        document.querySelectorAll('.glass-card').forEach(card => {
+            card.addEventListener('mousemove', e => {
+                const rect = card.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                card.style.setProperty('--x', `${x}px`);
+                card.style.setProperty('--y', `${y}px`);
+            });
+        });
+
+    </script>
+</body>
+</html>
