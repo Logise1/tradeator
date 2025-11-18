@@ -456,6 +456,40 @@
 
             const defaultSymbols = ['AAPL', 'GOOGL', 'MSFT', 'TSLA', 'AMZN', 'NVDA', 'META', 'JPM', 'V', 'NFLX'];
 
+            // NUEVA LISTA DE NOMBRES PRECARGADOS (Para las categorías de filtro)
+            const PreloadedNames = {
+                // Tech
+                'AAPL': 'Apple Inc.', 'MSFT': 'Microsoft Corp.', 'GOOGL': 'Alphabet Inc. (Cl A)', 
+                'NVDA': 'NVIDIA Corp.', 'META': 'Meta Platforms Inc.', 'TSLA': 'Tesla Inc.', 
+                'AMD': 'Advanced Micro Devices', 'INTC': 'Intel Corp.',
+                // ETFs
+                'SPY': 'SPDR S&P 500 ETF Trust', 'QQQ': 'Invesco QQQ Trust', 
+                'VOO': 'Vanguard S&P 500 ETF', 'VTI': 'Vanguard Total Stock Mkt ETF', 
+                'GLD': 'SPDR Gold Shares', 'SLV': 'iShares Silver Trust',
+                // Toys
+                'HAS': 'Hasbro Inc.', 'MAT': 'Mattel Inc.',
+                // Home
+                'HD': 'Home Depot Inc.', 'LOW': 'Lowe\'s Cos. Inc.', 
+                'WMT': 'Walmart Inc.', 'TGT': 'Target Corp.',
+                // Finanzas
+                'JPM': 'JPMorgan Chase & Co.', 'BAC': 'Bank of America Corp.', 
+                'WFC': 'Wells Fargo & Co.', 'C': 'Citigroup Inc.', 
+                'GS': 'Goldman Sachs Group Inc.', 'MS': 'Morgan Stanley',
+                // Salud
+                'JNJ': 'Johnson & Johnson', 'PFE': 'Pfizer Inc.', 
+                'UNH': 'UnitedHealth Group Inc.', 'MRK': 'Merck & Co. Inc.', 
+                'ABBV': 'AbbVie Inc.', 'LLY': 'Eli Lilly & Co.',
+                // Consumo
+                'PG': 'Procter & Gamble Co.', 'KO': 'Coca-Cola Co.', 
+                'PEP': 'PepsiCo Inc.', 'MCD': 'McDonald\'s Corp.', 
+                'NKE': 'Nike Inc.', 'COST': 'Costco Wholesale Corp.',
+                // Energía
+                'XOM': 'Exxon Mobil Corp.', 'CVX': 'Chevron Corp.', 
+                'SHEL': 'Shell plc', 'TTE': 'TotalEnergies SE', 'BP': 'BP plc',
+                // Por si acaso
+                'V': 'Visa Inc.', 'NFLX': 'Netflix Inc.', 'AMZN': 'Amazon.com Inc.',
+            };
+
             // NEW: Filter categories mapping
             const filterCategories = {
                 all: [...defaultSymbols],
@@ -476,7 +510,7 @@
                 portfolio: {}, // { "AAPL": 10 }
                 marketStocks: [], // Stores all fetched stock data (price, change, history)
                 currentSymbols: [...defaultSymbols], // Symbols currently displayed in market list
-                nameMap: {}, // To store full names of symbols from search/APIs
+                nameMap: {...PreloadedNames}, // INICIALIZADO CON NOMBRES PRECARGADOS
                 currentTrade: {},
                 // REMOVED: Chart.js related state (historicalDataCache, hourlyDataCache, symbolsWithFetchedHistory)
                 dailyProfitLoss: null, // New state for daily profit/loss
@@ -735,9 +769,9 @@
                 await fetchUserPortfolio();
                 await fetchMyTriggers();
                 
-                // Primero poblar el nameMap con los nombres de las categorías por defecto
-                const allSymbolsInCategories = new Set(Object.values(filterCategories).flat());
-                await updateNameMapFromSymbols(Array.from(allSymbolsInCategories));
+                // Antes de cargar el mercado, aseguramos que nameMap tiene todos los nombres predefinidos.
+                // Ya no necesitamos la llamada a updateNameMapFromSymbols() aquí, ya que nameMap está inicializado
+                // con PreloadedNames y solo necesitamos nombres de la API para búsquedas/nuevas acciones.
                 
                 await fetchHistoricalDataAndInitialMarket(); 
 
@@ -762,10 +796,13 @@
                 fetchDailySummary();
             }
 
+            // Mantenemos esta función para cargar nombres dinámicamente si es necesario (ej. por búsqueda)
             async function updateNameMapFromSymbols(symbols) {
-                // Función para hacer una llamada masiva y obtener nombres de empresas (no precios)
+                const symbolsToFetch = symbols.filter(s => !state.nameMap[s]);
+                 if (symbolsToFetch.length === 0) return;
+
                  try {
-                    const historyRes = await fetch(`${API_BASE_URL}/history?symbol=${symbols.join(',')}&days=1`);
+                    const historyRes = await fetch(`${API_BASE_URL}/history?symbol=${symbolsToFetch.join(',')}&days=1`);
                     if (historyRes.ok) {
                         const data = await historyRes.json();
                         const fetchedResults = data.results || {};
@@ -777,7 +814,7 @@
                         }
                     }
                 } catch (error) {
-                    console.error('Error poblando nameMap:', error.message);
+                    console.error('Error poblando nameMap dinámicamente:', error.message);
                 }
             }
 
@@ -1221,7 +1258,10 @@
                             for (const symbol in fetchedResults) {
                                 const meta = fetchedResults[symbol]['Meta Data'];
                                 if (meta && meta['ShortName'] && meta['ShortName'] !== symbol) {
-                                    state.nameMap[symbol] = meta['ShortName'];
+                                    // Sobreescribir solo si el nombre de la API es más preciso que el símbolo (si el nombre precargado no existe)
+                                    if (!state.nameMap[symbol] || state.nameMap[symbol] === symbol) {
+                                        state.nameMap[symbol] = meta['ShortName'];
+                                    }
                                 }
                             }
                             
@@ -1242,7 +1282,8 @@
                     if (symbolsAlreadyProcessedForMaster.has(symbol)) continue;
                     const hist = state.historicalDataCache[symbol];
                     let stockPrice, stockChange = 0, stockChangesPercentage = 0, stockHistory = [];
-                    let stockName = state.nameMap[symbol] || symbol; // Usar nameMap como primera fuente de nombre
+                    // Usar nameMap como primera fuente de nombre
+                    let stockName = state.nameMap[symbol] || symbol; 
 
                     if (hist && hist['Time Series']) {
                         const historyEntries = Object.entries(hist['Time Series']).sort(([dateA], [dateB]) => new Date(dateA) - new Date(dateB));
@@ -1254,10 +1295,12 @@
                             stockChange = latestClose - previousClose;
                             stockChangesPercentage = (previousClose !== 0) ? (stockChange / previousClose) * 100 : 0;
                         }
-                        // Usar el nombre del history si no es el símbolo y si no está ya en nameMap (o actualizar el nameMap)
+                        // Reforzar nameMap si se encuentra un ShortName en el historial que es mejor que el actual.
                         if (hist['Meta Data'] && hist['Meta Data']['ShortName'] && hist['Meta Data']['ShortName'] !== symbol) {
-                            stockName = hist['Meta Data']['ShortName'];
-                            state.nameMap[symbol] = stockName;
+                            if (!state.nameMap[symbol] || state.nameMap[symbol] === symbol) {
+                                stockName = hist['Meta Data']['ShortName'];
+                                state.nameMap[symbol] = stockName;
+                            }
                         }
                     }
                     const currentLivePriceInState = state.marketStocks.find(s => s.symbol === symbol)?.price;
@@ -1331,13 +1374,12 @@
                 
                 stocksToDisplay.forEach(stock => {
                     if (!stock) return;
-                    const { symbol, name, price, change, changesPercentage, history } = stock;
+                    const { symbol, price, change, changesPercentage, history } = stock;
                     const changeClass = change >= 0 ? 'stock-up' : 'stock-down';
                     const changeSign = change >= 0 ? '+' : '';
 
-                    // CORRECCIÓN: Usar nameMap como fuente principal, ya que se actualiza en init y fetchTopStocks.
-                    // Mostrar el nombre solo si es diferente al símbolo.
-                    const displayName = state.nameMap[symbol] && state.nameMap[symbol] !== symbol ? state.nameMap[symbol] : name;
+                    // OBTENER EL NOMBRE DEL EMPRESA DE nameMap
+                    const displayName = state.nameMap[symbol] && state.nameMap[symbol] !== symbol ? state.nameMap[symbol] : symbol;
 
                     const stockEl = document.createElement('div');
                     stockEl.className = 'stock-item grid grid-cols-3 md:grid-cols-5 items-center bg-gray-900 p-4 rounded-lg cursor-pointer hover:bg-gray-700/50';
@@ -1870,7 +1912,8 @@
                         
                         // 1. Actualizar nameMap con los nombres de las acciones destacadas
                         data.forEach(item => {
-                            state.nameMap[item.symbol] = item.name || item.symbol;
+                            // Usar el nombre del API o el nombre precargado si es mejor
+                            state.nameMap[item.symbol] = item.name || state.nameMap[item.symbol] || item.symbol;
                         });
                         
                         // Always fetch history for newly displayed stocks
@@ -1889,7 +1932,10 @@
                                     for (const symbol in fetchedResults) {
                                         const meta = fetchedResults[symbol]['Meta Data'];
                                         if (meta && meta['ShortName'] && meta['ShortName'] !== symbol) {
-                                            state.nameMap[symbol] = meta['ShortName'];
+                                            // Sobreescribir solo si la API de historial tiene un mejor nombre
+                                            if (!state.nameMap[symbol] || state.nameMap[symbol] === symbol) {
+                                                state.nameMap[symbol] = meta['ShortName'];
+                                            }
                                         }
                                     }
                                 } else {
