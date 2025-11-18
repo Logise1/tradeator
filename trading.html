@@ -735,6 +735,10 @@
                 await fetchUserPortfolio();
                 await fetchMyTriggers();
                 
+                // Primero poblar el nameMap con los nombres de las categorías por defecto
+                const allSymbolsInCategories = new Set(Object.values(filterCategories).flat());
+                await updateNameMapFromSymbols(Array.from(allSymbolsInCategories));
+                
                 await fetchHistoricalDataAndInitialMarket(); 
 
                 if (marketDataInterval) clearInterval(marketDataInterval);
@@ -757,6 +761,26 @@
                 
                 fetchDailySummary();
             }
+
+            async function updateNameMapFromSymbols(symbols) {
+                // Función para hacer una llamada masiva y obtener nombres de empresas (no precios)
+                 try {
+                    const historyRes = await fetch(`${API_BASE_URL}/history?symbol=${symbols.join(',')}&days=1`);
+                    if (historyRes.ok) {
+                        const data = await historyRes.json();
+                        const fetchedResults = data.results || {};
+                        for (const symbol in fetchedResults) {
+                            const meta = fetchedResults[symbol]['Meta Data'];
+                            if (meta && meta['ShortName'] && meta['ShortName'] !== symbol) {
+                                state.nameMap[symbol] = meta['ShortName'];
+                            }
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error poblando nameMap:', error.message);
+                }
+            }
+
 
             async function fetchUserMoney() {
                 try {
@@ -1192,7 +1216,15 @@
                         if (historyRes.ok) {
                             const data = await historyRes.json();
                             const fetchedResults = data.results || {};
-                            // Use a temporary cache for this simpler history data
+                            
+                            // Actualizar el nameMap con los nombres obtenidos de la llamada de historial
+                            for (const symbol in fetchedResults) {
+                                const meta = fetchedResults[symbol]['Meta Data'];
+                                if (meta && meta['ShortName'] && meta['ShortName'] !== symbol) {
+                                    state.nameMap[symbol] = meta['ShortName'];
+                                }
+                            }
+                            
                             state.historicalDataCache = fetchedResults; 
                         } else {
                             console.warn(`Error fetching historical data for new symbols: ${historyRes.statusText}`);
@@ -1210,7 +1242,7 @@
                     if (symbolsAlreadyProcessedForMaster.has(symbol)) continue;
                     const hist = state.historicalDataCache[symbol];
                     let stockPrice, stockChange = 0, stockChangesPercentage = 0, stockHistory = [];
-                    let stockName = state.nameMap[symbol] || symbol;
+                    let stockName = state.nameMap[symbol] || symbol; // Usar nameMap como primera fuente de nombre
 
                     if (hist && hist['Time Series']) {
                         const historyEntries = Object.entries(hist['Time Series']).sort(([dateA], [dateB]) => new Date(dateA) - new Date(dateB));
@@ -1222,8 +1254,10 @@
                             stockChange = latestClose - previousClose;
                             stockChangesPercentage = (previousClose !== 0) ? (stockChange / previousClose) * 100 : 0;
                         }
-                        if (hist['Meta Data']) {
-                            stockName = hist['Meta Data']['2. Symbol'] || hist['Meta Data']['Symbol'] || stockName;
+                        // Usar el nombre del history si no es el símbolo y si no está ya en nameMap (o actualizar el nameMap)
+                        if (hist['Meta Data'] && hist['Meta Data']['ShortName'] && hist['Meta Data']['ShortName'] !== symbol) {
+                            stockName = hist['Meta Data']['ShortName'];
+                            state.nameMap[symbol] = stockName;
                         }
                     }
                     const currentLivePriceInState = state.marketStocks.find(s => s.symbol === symbol)?.price;
@@ -1301,12 +1335,17 @@
                     const changeClass = change >= 0 ? 'stock-up' : 'stock-down';
                     const changeSign = change >= 0 ? '+' : '';
 
+                    // CORRECCIÓN: Usar nameMap como fuente principal, ya que se actualiza en init y fetchTopStocks.
+                    // Mostrar el nombre solo si es diferente al símbolo.
+                    const displayName = state.nameMap[symbol] && state.nameMap[symbol] !== symbol ? state.nameMap[symbol] : name;
+
                     const stockEl = document.createElement('div');
                     stockEl.className = 'stock-item grid grid-cols-3 md:grid-cols-5 items-center bg-gray-900 p-4 rounded-lg cursor-pointer hover:bg-gray-700/50';
                     stockEl.dataset.symbol = symbol;
                     stockEl.innerHTML = `
                         <div class="col-span-2 md:col-span-2">
-                            <p class="font-bold text-lg">${symbol}</p><p class="text-sm text-gray-400 truncate">${name}</p>
+                            <p class="font-bold text-lg">${symbol}</p>
+                            <p class="text-sm text-gray-400 truncate">${displayName}</p>
                         </div>
                         <div class="hidden md:block">${generateSparkline(history, change)}</div>
                         <div class="text-right">
@@ -1715,8 +1754,8 @@
             async function fetchTradeHistory() {
                 try {
                     historyLoadingStatusEl.classList.remove('hidden');
-                    // Endpoint sin parámetros, simplemente devuelve todo el historial del usuario autenticado
-                    const data = await authedFetch('/tradehistory'); 
+                    // MODIFICACIÓN: Llamar a la nueva ruta /trades/history
+                    const data = await authedFetch('/trades/history'); 
                     
                     const tradesArray = Object.values(data);
                     
@@ -1795,6 +1834,7 @@
                             if(data && data.length > 0) {
                                 state.currentSymbols = data.map(item => item.symbol);
                                 data.forEach(item => {
+                                    // Actualizar nameMap con el resultado de la búsqueda
                                     state.nameMap[item.symbol] = item.name || item.symbol;
                                 });
                             } else {
@@ -1828,6 +1868,11 @@
                     if (data && data.length > 0) {
                         state.currentSymbols = data.map(item => item.symbol);
                         
+                        // 1. Actualizar nameMap con los nombres de las acciones destacadas
+                        data.forEach(item => {
+                            state.nameMap[item.symbol] = item.name || item.symbol;
+                        });
+                        
                         // Always fetch history for newly displayed stocks
                         const symbolsToFetchHistory = state.currentSymbols;
                         
@@ -1839,6 +1884,14 @@
                                     const fetchedResults = historyData.results || {};
                                     // Update main cache for history/sparklines
                                     Object.assign(state.historicalDataCache, fetchedResults);
+
+                                    // 1b. Reforzar el nameMap con datos del history (que trae ShortName)
+                                    for (const symbol in fetchedResults) {
+                                        const meta = fetchedResults[symbol]['Meta Data'];
+                                        if (meta && meta['ShortName'] && meta['ShortName'] !== symbol) {
+                                            state.nameMap[symbol] = meta['ShortName'];
+                                        }
+                                    }
                                 } else {
                                     console.warn(`Error fetching historical data for top stocks: ${historyRes.statusText}`);
                                 }
@@ -1849,7 +1902,8 @@
 
                         const newMarketStocks = [];
                         data.forEach(item => {
-                            state.nameMap[item.symbol] = item.name || item.symbol;
+                            // Usar el nombre del nameMap (ya actualizado) o el nombre del item.
+                            const nameToUse = state.nameMap[item.symbol] || item.name || item.symbol;
                             
                             // Extract history for sparkline from cache
                             const historyForSparkline = (state.historicalDataCache[item.symbol] && state.historicalDataCache[item.symbol]['Time Series']) ? 
@@ -1857,7 +1911,7 @@
                                 
                             newMarketStocks.push({
                                 symbol: item.symbol,
-                                name: item.name,
+                                name: nameToUse, // Asegurar que 'name' dentro de marketStocks es el nombre completo.
                                 price: item.price,
                                 change: item.change,
                                 changesPercentage: item.changePercent, 
@@ -1916,6 +1970,7 @@
                 state.currentSymbols = filterCategories[filter] || [...defaultSymbols];
                 searchInputEl.value = '';
                 updateFilterButtons();
+                // Al cambiar el filtro, volvemos a cargar con los símbolos del filtro
                 fetchHistoricalDataAndInitialMarket();
             }
 
