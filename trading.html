@@ -463,7 +463,8 @@
             let marketTimerInterval = null; // NEW: Interval for market timer
             // REMOVED: let currentChartInstance = null;
             const MARKET_DATA_UPDATE_INTERVAL_MS = 3000; // Update market prices every 3 seconds
-            const LEADERBOARD_UPDATE_INTERVAL_MS = 10000; // Update leaderboard every 10 seconds
+            // MODIFICACIÓN SOLICITADA: Reducir el intervalo para una actualización más frecuente (anteriormente 10000ms)
+            const LEADERBOARD_UPDATE_INTERVAL_MS = 3000; // Update leaderboard every 3 seconds
             const TRIGGER_CHECK_INTERVAL_MS = 30000; // Check triggers every 30 seconds
 
             // --- DOM ELEMENTS ---
@@ -1362,7 +1363,10 @@
 
             async function fetchLeaderboardData() {
                 try {
-                    const data = await authedFetch('/leaderboard');
+                    // MODIFICACIÓN SOLICITADA: Añadir cache-buster a la URL
+                    const cacheBuster = Date.now();
+                    const data = await authedFetch(`/leaderboard?_t=${cacheBuster}`);
+                    
                     if (data.leaderboard && data.leaderboard.length > 0) {
                         renderLeaderboard(data.leaderboard);
                     } else {
