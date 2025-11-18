@@ -6,15 +6,13 @@
     <title>Tradeator</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <!-- Chart.js for detailed graphs -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Chart.js REMOVED: Replaced by TradingView Embed -->
 
     <!-- Web App Manifest para Android (Chrome) -->
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#111827"> <!-- Color de la barra de herramientas del navegador -->
 
-    <!-- Iconos para PWA y Android (se usarán en el manifest.json) -->
-    <!-- Estos son ejemplos, DEBERÍAS REEMPLAZARLOS con tus propios iconos -->
+    <!-- Iconos para PWA y Android -->
     <link rel="icon" type="image/png" sizes="192x192" href="https://weberia.neocities.org/stock.png" purpose="any maskable">
     <link rel="icon" type="image/png" sizes="512x512" href="https://weberia.neocities.org/stock.png" purpose="any maskable">
 
@@ -23,7 +21,6 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Tradeator">
     <!-- Iconos para iOS (Apple Touch Icons) -->
-    <!-- Estos son ejemplos, DEBERÍAS REEMPLAZARLOS con tus propios iconos -->
     <link rel="apple-touch-icon" href="https://weberia.neocities.org/stock.png">
     <link rel="apple-touch-icon" sizes="152x152" href="https://weberia.neocities.org/stock.png">
     <link rel="apple-touch-icon" sizes="167x167" href="https://weberia.neocities.org/stock.png">
@@ -134,8 +131,6 @@
 </head>
 <body class="bg-gray-900 text-gray-100">
 
-    <!-- Background Music -->
-
     <!-- Global Loading Overlay -->
     <div id="global-loading-overlay">
         <div class="loader"></div>
@@ -143,7 +138,6 @@
     </div>
 
     <!-- Authentication View -->
-    <!-- This is the default view on page load -->
     <div id="auth-view" class="min-h-screen flex items-center justify-center">
         <div class="w-full max-w-md p-8 space-y-8 bg-gray-800 rounded-lg shadow-lg">
             <div>
@@ -389,7 +383,7 @@
         </div>
     </div>
 
-    <!-- New Chart Modal -->
+    <!-- New Chart Modal (Modified for TradingView Embed) -->
     <div id="chart-modal" class="fixed inset-0 z-50 items-center justify-center hidden">
         <div class="modal-backdrop fixed inset-0"></div>
         <div class="bg-gray-800 rounded-lg shadow-xl p-6 w-11/12 md:w-1/2 max-w-2xl z-10">
@@ -398,10 +392,12 @@
                 <button id="close-chart-modal-button" class="text-gray-400 hover:text-white text-xl font-bold">&times;</button>
             </div>
             <div id="chart-loader" class="chart-loader hidden"></div>
-            <!-- Modificación aquí: Envolver el canvas en un div con las clases de tamaño -->
-            <div class="relative w-full h-80"> 
-                <canvas id="stockChart"></canvas>
+            
+            <!-- NEW: Container for TradingView Embed -->
+            <div id="tradingview-container" class="relative w-full h-[50vh] min-h-[300px] overflow-hidden">
+                <!-- The iframe (TradingView widget) will be inserted here -->
             </div>
+
             <p id="chart-error-message" class="text-red-400 text-center mt-4 hidden">Error al cargar el gráfico.</p>
         </div>
     </div>
@@ -412,13 +408,16 @@
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             // --- CONFIG & STATE ---
-            // Base URL for historical data and search
             const API_BASE_URL = 'https://finances.logise1123.workers.dev';
-            // Base URL for live values
             const API_LIVE_VALUES_URL = 'https://finances.logise1123.workers.dev/livevalues';
             
             // ATENCIÓN: Debes configurar esta clave secreta en el Worker de Cloudflare
             const WORKER_TRIGGER_SECRET = "YOUR_SUPER_SECRET_KEY_HERE_FOR_PRIVILEGED_EXECUTION";
+            
+            // --- NEW: Daily Signup Cooldown Config ---
+            const SIGNUP_COOLDOWN_KEY = 'stock_simulator_last_signup';
+            const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+            // --- END NEW CONFIG ---
 
             const defaultSymbols = ['AAPL', 'GOOGL', 'MSFT', 'TSLA', 'AMZN', 'NVDA', 'META', 'JPM', 'V', 'NFLX'];
 
@@ -444,9 +443,7 @@
                 currentSymbols: [...defaultSymbols], // Symbols currently displayed in market list
                 nameMap: {}, // To store full names of symbols from search/APIs
                 currentTrade: {},
-                historicalDataCache: {}, // New cache to store historical data once fetched
-                hourlyDataCache: {}, // New cache for hourly data for detailed charts
-                symbolsWithFetchedHistory: new Set(), // Track symbols for which 1-day history has been fetched
+                // REMOVED: Chart.js related state (historicalDataCache, hourlyDataCache, symbolsWithFetchedHistory)
                 dailyProfitLoss: null, // New state for daily profit/loss
                 previousDayPortfolioValue: 0, // New state for previous day portfolio value
                 activeFilter: 'all', 
@@ -454,17 +451,17 @@
                 isCheckingTriggers: false, // NEW: Flag to prevent concurrent trigger checks
             };
             
-            let isLoginMode = true; // MOVED DECLARATION HERE
+            let isLoginMode = true; 
 
             // Interval IDs for data updates
             let marketDataInterval = null;
             let leaderboardInterval = null;
             let triggerCheckInterval = null; // NEW: Interval for checking triggers
             let marketTimerInterval = null; // NEW: Interval for market timer
-            let currentChartInstance = null; // To hold the Chart.js instance for destruction
+            // REMOVED: let currentChartInstance = null;
             const MARKET_DATA_UPDATE_INTERVAL_MS = 3000; // Update market prices every 3 seconds
             const LEADERBOARD_UPDATE_INTERVAL_MS = 10000; // Update leaderboard every 10 seconds
-            const TRIGGER_CHECK_INTERVAL_MS = 30000; // SOLICITADO: Check triggers every 30 seconds
+            const TRIGGER_CHECK_INTERVAL_MS = 30000; // Check triggers every 30 seconds
 
             // --- DOM ELEMENTS ---
             const globalLoadingOverlay = document.getElementById('global-loading-overlay');
@@ -490,7 +487,7 @@
             const chartModal = document.getElementById('chart-modal');
             const chartModalTitleEl = document.getElementById('chart-modal-title');
             const closeChartModalButton = document.getElementById('close-chart-modal-button');
-            const stockChartCanvas = document.getElementById('stockChart');
+            const tradingviewContainer = document.getElementById('tradingview-container'); // NEW container
             const chartLoader = document.getElementById('chart-loader');
             const chartErrorMessage = document.getElementById('chart-error-message');
             
@@ -560,8 +557,6 @@
 
             // --- AUTHENTICATION & INITIALIZATION ---
             
-            // let isLoginMode = true; // REMOVED FROM HERE
-
             async function startAppLoadingSequence() {
                 try {
                     await initializeMainApp();
@@ -622,6 +617,17 @@
                 const password = authForm.password.value;
                 const endpoint = isLoginMode ? '/login' : '/signup';
                 const originalButtonText = authSubmitButton.textContent;
+                
+                // --- MODIFICACIÓN: Límite de creación de cuenta por día (Simulación cliente) ---
+                if (!isLoginMode) {
+                    const lastSignup = localStorage.getItem(SIGNUP_COOLDOWN_KEY);
+                    if (lastSignup && (Date.now() - parseInt(lastSignup)) < ONE_DAY_MS) {
+                        showNotification('Solo se permite una creación de cuenta por día. Inténtalo de nuevo mañana.', 'error');
+                        return; // Detener si está en cooldown
+                    }
+                }
+                // --- FIN MODIFICACIÓN ---
+
                 setButtonLoading(authSubmitButton, originalButtonText, true);
                 
                 try {
@@ -637,6 +643,8 @@
                         showGlobalLoader();
                         await startAppLoadingSequence();
                     } else {
+                        // Si la creación fue exitosa, establecer el cooldown
+                        localStorage.setItem(SIGNUP_COOLDOWN_KEY, Date.now().toString());
                         showNotification('Cuenta creada con éxito. Ahora inicia sesión.', 'success');
                         toggleAuthMode();
                     }
@@ -653,10 +661,9 @@
                 if (triggerCheckInterval) clearInterval(triggerCheckInterval);
                 if (marketTimerInterval) clearInterval(marketTimerInterval); // NEW: Clear timer interval
                 marketDataInterval = null; leaderboardInterval = null; triggerCheckInterval = null; marketTimerInterval = null;
-                if (currentChartInstance) { currentChartInstance.destroy(); currentChartInstance = null; }
+                // REMOVED: Chart destroy logic
                 localStorage.removeItem('stock_simulator_username'); localStorage.removeItem('stock_simulator_password');
-                state.authToken = null; state.username = null; state.portfolio = {}; state.cash = 0; state.historicalDataCache = {};
-                state.hourlyDataCache = {}; state.symbolsWithFetchedHistory = new Set(); state.dailyProfitLoss = null; state.previousDayPortfolioValue = 0;
+                state.authToken = null; state.username = null; state.portfolio = {}; state.cash = 0; // REMOVED: Chart caches from state
                 state.activeFilter = 'all'; state.triggers = {}; state.allUserTriggers = {};
                 mainAppView.style.opacity = '0';
                 setTimeout(() => { mainAppView.classList.add('hidden'); authView.classList.remove('hidden'); authView.style.opacity = '1'; }, 500);
@@ -731,7 +738,6 @@
                     const stockData = state.marketStocks.find(s => s.symbol === symbol);
                     if (stockData) {
                         // MODIFICACIÓN: La valoración es (precio * cantidad)
-                        // Si la cantidad es -10 (short) y el precio es 100, el valor es -1000 (una deuda)
                         portfolioValue += stockData.price * quantity;
                     }
                 }
@@ -827,7 +833,6 @@
                 const { statusText, remainingTimeHms } = calculateMarketTime();
 
                 // Update Status (e.g., Cierre del NASDAQ or Apertura del NASDAQ)
-                // Use innerHTML to include the orange clock emoji (U+1F551) for the timer.
                 timerStatusEl.textContent = statusText;
 
                 // Update Display (e.g., 02:12:25)
@@ -935,14 +940,6 @@
                         showNotification('Debe seleccionar fecha y hora de ejecución.', 'error'); return;
                     }
                 }
-
-                // --- MODIFICACIÓN ---
-                // Se elimina la comprobación de si tiene suficientes acciones para VENDER.
-                // if (action === 'sell' && (state.portfolio[symbol] || 0) < quantity) {
-                //     showNotification(`No tienes ${quantity} acciones de ${symbol} para vender. Tienes: ${state.portfolio[symbol] || 0}.`, 'error');
-                //     return;
-                // }
-                // --- FIN DE MODIFICACIÓN ---
 
                 const originalButtonText = triggerSubmitButton.textContent;
                 setButtonLoading(triggerSubmitButton, originalButtonText, true);
@@ -1127,23 +1124,17 @@
             async function fetchHistoricalDataAndInitialMarket() {
                 showLoader();
                 const allSymbolsToInitialize = new Set([...defaultSymbols, ...state.currentSymbols, ...Object.keys(state.portfolio), ...Object.values(state.triggers).map(t => t.symbol)]);
-                const symbolsForHistoryFetch = Array.from(allSymbolsToInitialize).filter(
-                    symbol => !state.symbolsWithFetchedHistory.has(symbol)
-                );
+                const symbolsForHistoryFetch = Array.from(allSymbolsToInitialize); // Fetch all to initialize marketStocks (no longer rely on symbolsWithFetchedHistory set)
+                
                 if (symbolsForHistoryFetch.length > 0) {
                     try {
+                        // Fetch only historical price points for the sparkline (day resolution)
                         const historyRes = await fetch(`${API_BASE_URL}/history?symbol=${symbolsForHistoryFetch.join(',')}&days=10`);
                         if (historyRes.ok) {
                             const data = await historyRes.json();
                             const fetchedResults = data.results || {};
-                            for (const symbol of symbolsForHistoryFetch) {
-                                if (fetchedResults[symbol]) {
-                                    state.historicalDataCache[symbol] = fetchedResults[symbol];
-                                    state.symbolsWithFetchedHistory.add(symbol);
-                                } else {
-                                    delete state.historicalDataCache[symbol]; 
-                                }
-                            }
+                            // Use a temporary cache for this simpler history data
+                            state.historicalDataCache = fetchedResults; 
                         } else {
                             console.warn(`Error fetching historical data for new symbols: ${historyRes.statusText}`);
                         }
@@ -1155,14 +1146,17 @@
                 const newMasterMarketStocks = [];
                 const symbolsAlreadyProcessedForMaster = new Set();
                 const combinedSymbols = new Set([...state.currentSymbols, ...Object.keys(state.portfolio), ...Object.values(state.triggers).map(t => t.symbol)]);
+                
                 for (const symbol of combinedSymbols) {
                     if (symbolsAlreadyProcessedForMaster.has(symbol)) continue;
                     const hist = state.historicalDataCache[symbol];
                     let stockPrice, stockChange = 0, stockChangesPercentage = 0, stockHistory = [];
                     let stockName = state.nameMap[symbol] || symbol;
+
                     if (hist && hist['Time Series']) {
                         const historyEntries = Object.entries(hist['Time Series']).sort(([dateA], [dateB]) => new Date(dateA) - new Date(dateB));
                         stockHistory = historyEntries.map(([, data]) => parseFloat(data['4. close']));
+                        
                         if (stockHistory.length >= 2) {
                             const latestClose = stockHistory[stockHistory.length - 1];
                             const previousClose = stockHistory[stockHistory.length - 2];
@@ -1177,6 +1171,7 @@
                     if (currentLivePriceInState !== undefined) { stockPrice = currentLivePriceInState; } 
                     else if (stockHistory.length > 0) { stockPrice = stockHistory[stockHistory.length - 1]; } 
                     else { continue; }
+
                     newMasterMarketStocks.push({
                         symbol: symbol, name: stockName, price: stockPrice, change: stockChange, changesPercentage: stockChangesPercentage, history: stockHistory
                     });
@@ -1209,7 +1204,17 @@
                 state.marketStocks = state.marketStocks.map(stock => {
                     const livePrice = liveValuesData[stock.symbol];
                     if (livePrice !== undefined && livePrice !== null && !isNaN(livePrice)) {
-                        const prevPrice = (stock.history && stock.history.length >= 2) ? stock.history[stock.history.length - 2] : stock.price;
+                        // Use historical data for the 'previous day close' reference
+                        const historyForRef = state.historicalDataCache[stock.symbol]?.['Time Series'];
+                        const sortedDates = historyForRef ? Object.keys(historyForRef).sort() : [];
+                        
+                        let prevPrice = stock.price; // Fallback to current price if no proper history is available
+                        if (sortedDates.length >= 2) {
+                            prevPrice = parseFloat(historyForRef[sortedDates[sortedDates.length - 2]]['4. close']);
+                        } else if (stock.history && stock.history.length >= 2) {
+                            prevPrice = stock.history[stock.history.length - 2];
+                        }
+
                         const newChange = livePrice - prevPrice;
                         const newChangePercent = (prevPrice !== 0) ? (newChange / prevPrice) * 100 : 0;
                         return { ...stock, price: livePrice, change: newChange, changesPercentage: newChangePercent };
@@ -1249,10 +1254,10 @@
                             <p class="font-semibold text-lg">$${price.toFixed(2)}</p>
                             <p class="text-sm ${changeClass}">${changeSign}${change.toFixed(2)}$ (${changeSign}${changesPercentage.toFixed(2)}%)</p>
                         </div>
-                        <!-- MODIFICACIÓN: Añadido botón de VENDER (Short) -->
+                        <!-- MODIFICACIÓN: Botones más pequeños (py-1 px-2) -->
                         <div class="flex flex-col md:flex-row justify-end ml-2 space-y-1 md:space-y-0 md:space-x-1">
-                            <button data-symbol="${symbol}" data-type="buy" class="trade-btn text-xs font-bold bg-green-600 hover:bg-green-500 text-white py-2 px-3 rounded-md">COMPRAR</button>
-                            <button data-symbol="${symbol}" data-type="sell" class="trade-btn text-xs font-bold bg-red-600 hover:bg-red-500 text-white py-2 px-3 rounded-md">VENDER</button>
+                            <button data-symbol="${symbol}" data-type="buy" class="trade-btn text-xs font-bold bg-green-600 hover:bg-green-500 text-white py-1 px-2 rounded-md">COMPRAR</button>
+                            <button data-symbol="${symbol}" data-type="sell" class="trade-btn text-xs font-bold bg-red-600 hover:bg-red-500 text-white py-1 px-2 rounded-md">VENDER</button>
                         </div>`;
                     stockMarketListEl.appendChild(stockEl);
                 });
@@ -1299,9 +1304,6 @@
 
                     let stockDailyProfitLossHtml = '';
                     if (stockData && stockData.change !== undefined && stockData.changesPercentage !== undefined) {
-                        // MODIFICACIÓN: El cálculo de P/L diario (change * quantity)
-                        // funciona automáticamente para cortos.
-                        // Si (change = +$2) y (quantity = -10), P/L = -$20 (Pérdida, correcto)
                         const dailyChangeAmount = stockData.change * quantity; 
                         const dailyChangePercentage = stockData.changesPercentage * (quantity > 0 ? 1 : -1); // Invertir % si es corto
                         const plClass = dailyChangeAmount >= 0 ? 'profit' : 'loss';
@@ -1332,10 +1334,10 @@
                                 ${stockDailyProfitLossHtml}
                             </div>
                         </div>
+                        <!-- MODIFICACIÓN: Botones más pequeños (py-1 px-2) -->
                         <div class="mt-2 grid grid-cols-2 gap-2">
-                            <!-- MODIFICACIÓN: Añadido botón de COMPRAR (Cubrir corto) -->
-                            <button data-symbol="${symbol}" data-type="buy" class="trade-btn w-full text-xs font-bold bg-green-600 hover:bg-green-500 text-white py-2 px-3 rounded-md">${quantity < 0 ? 'CUBRIR' : 'COMPRAR'}</button>
-                            <button data-symbol="${symbol}" data-type="sell" class="trade-btn w-full text-xs font-bold bg-red-600 hover:bg-red-500 text-white py-2 px-3 rounded-md">${quantity > 0 ? 'VENDER' : 'V. CORTO'}</button>
+                            <button data-symbol="${symbol}" data-type="buy" class="trade-btn w-full text-xs font-bold bg-green-600 hover:bg-green-500 text-white py-1 px-2 rounded-md">${quantity < 0 ? 'CUBRIR' : 'COMPRAR'}</button>
+                            <button data-symbol="${symbol}" data-type="sell" class="trade-btn w-full text-xs font-bold bg-red-600 hover:bg-red-500 text-white py-1 px-2 rounded-md">${quantity > 0 ? 'VENDER' : 'V. CORTO'}</button>
                         </div>`;
                     portfolioListEl.appendChild(el);
                 }
@@ -1538,14 +1540,6 @@
                     return;
                 }
                 
-                // --- MODIFICACIÓN ---
-                // Se elimina la comprobación de si tiene suficientes acciones para VENDER.
-                // if (type === 'sell' && (state.portfolio[symbol] || 0) < quantity) {
-                //    showNotification('No tienes suficientes acciones para vender.', 'error');
-                //    return;
-                // }
-                // --- FIN DE MODIFICACIÓN ---
-
                 const originalConfirmText = confirmButtonEl.textContent;
                 setButtonLoading(confirmButtonEl, originalConfirmText, true);
 
@@ -1564,95 +1558,41 @@
                 modal.classList.remove('flex');
             }
 
-            // --- CHART MODAL FUNCTIONS ---
+            // --- CHART MODAL FUNCTIONS (MODIFIED FOR TRADINGVIEW) ---
             async function openChartModal(symbol) {
-                chartModalTitleEl.textContent = `Gráfico de ${symbol}`;
+                chartModalTitleEl.textContent = `Gráfico de ${symbol} (TradingView)`;
                 chartModal.classList.remove('hidden');
                 chartModal.classList.add('flex');
                 chartLoader.classList.remove('hidden');
                 chartErrorMessage.classList.add('hidden');
 
-                if (currentChartInstance) {
-                    currentChartInstance.destroy();
-                    currentChartInstance = null;
-                }
-
-                try {
-                    let historicalData = state.hourlyDataCache[symbol];
-
-                    if (!historicalData) {
-                        const response = await fetch(`${API_BASE_URL}/history?symbol=${symbol}&days=50&diff=1h`);
-                        if (!response.ok) {
-                            throw new Error('Error al cargar datos históricos.');
-                        }
-                        const data = await response.json();
-                        historicalData = data.results && data.results[symbol] && data.results[symbol]['Time Series'] ? data.results[symbol]['Time Series'] : null;
-                        if (!historicalData || Object.keys(historicalData).length === 0) {
-                            throw new Error('No se encontraron datos detallados para el gráfico.');
-                        }
-                        state.hourlyDataCache[symbol] = historicalData; 
-                    }
-
-                    const labels = [];
-                    const prices = [];
-                    const sortedDates = Object.keys(historicalData).sort();
-
-                    sortedDates.forEach(date => {
-                        labels.push(new Date(date).toLocaleString()); 
-                        prices.push(parseFloat(historicalData[date]['4. close']));
-                    });
-
-                    const ctx = stockChartCanvas.getContext('2d');
-                    currentChartInstance = new Chart(ctx, {
-                        type: 'line',
-                        data: {
-                            labels: labels,
-                            datasets: [{
-                                label: `${symbol} Precio`,
-                                data: prices,
-                                borderColor: '#3B82F6',
-                                borderWidth: 2,
-                                fill: false,
-                                tension: 0.1,
-                            }]
-                        },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false, 
-                            plugins: {
-                                legend: { labels: { color: '#F9FAFB' } }
-                            },
-                            scales: {
-                                x: {
-                                    ticks: { color: '#D1D5DB' },
-                                    grid: { color: '#4B5563' }
-                                },
-                                y: {
-                                    ticks: { color: '#D1D5DB' },
-                                    grid: { color: '#4B5563' }
-                                }
-                            }
-                        }
-                    });
-
-                } catch (error) {
-                    console.error("Error drawing chart:", error);
-                    chartErrorMessage.textContent = `Error: ${error.message}`;
-                    chartErrorMessage.classList.remove('hidden');
-                    stockChartCanvas.classList.add('hidden');
-                } finally {
-                    chartLoader.classList.add('hidden');
-                }
+                // Clear previous content
+                tradingviewContainer.innerHTML = '';
+                
+                // TradingView Widget HTML (Dark theme, 100% size)
+                const tvEmbedHtml = `
+                    <div class="tradingview-widget-container h-full w-full">
+                        <iframe
+                            src="https://s.tradingview.com/widgetembed/?symbol=NASDAQ%3A${symbol}&amp;interval=D&amp;hidesidetoolbar=0&amp;hidetoptoolbar=0&amp;saveimage=false&amp;toolbarbg=1F2937&amp;details=false&amp;studies=RSI%40tv-basiccharts%2CMACD%40tv-basiccharts&amp;theme=dark&amp;style=1&amp;timezone=America%2FNew_York&amp;studies_overrides={}&amp;utm_source=tradeator&amp;utm_medium=widget&amp;utm_campaign=chart&amp;utm_term=${symbol}"
+                            style="width: 100%; height: 100%;"
+                            allowfullscreen
+                            frameborder="0"
+                            loading="lazy"
+                        ></iframe>
+                    </div>
+                `;
+                
+                // Insert the iframe
+                tradingviewContainer.innerHTML = tvEmbedHtml;
+                chartLoader.classList.add('hidden');
+                
             }
 
             function closeChartModal() {
                 chartModal.classList.add('hidden');
                 chartModal.classList.remove('flex');
-                if (currentChartInstance) {
-                    currentChartInstance.destroy();
-                    currentChartInstance = null;
-                }
-                stockChartCanvas.classList.remove('hidden');
+                // Clear the iframe content to stop playback/loading
+                document.getElementById('tradingview-container').innerHTML = '';
             }
 
 
@@ -1713,24 +1653,17 @@
                     if (data && data.length > 0) {
                         state.currentSymbols = data.map(item => item.symbol);
                         
-                        const symbolsToFetchHistory = state.currentSymbols.filter(
-                            symbol => !state.symbolsWithFetchedHistory.has(symbol)
-                        );
+                        // Always fetch history for newly displayed stocks
+                        const symbolsToFetchHistory = state.currentSymbols;
+                        
                         if (symbolsToFetchHistory.length > 0) {
                              try {
                                 const historyRes = await fetch(`${API_BASE_URL}/history?symbol=${symbolsToFetchHistory.join(',')}&days=10`);
                                 if (historyRes.ok) {
                                     const historyData = await historyRes.json();
                                     const fetchedResults = historyData.results || {};
-                                    for (const symbol of symbolsToFetchHistory) {
-                                        if (fetchedResults[symbol]) {
-                                            state.historicalDataCache[symbol] = fetchedResults[symbol];
-                                            state.symbolsWithFetchedHistory.add(symbol);
-                                        } else {
-                                            delete state.historicalDataCache[symbol]; 
-                                            state.symbolsWithFetchedHistory.delete(symbol);
-                                        }
-                                    }
+                                    // Update main cache for history/sparklines
+                                    Object.assign(state.historicalDataCache, fetchedResults);
                                 } else {
                                     console.warn(`Error fetching historical data for top stocks: ${historyRes.statusText}`);
                                 }
@@ -1742,17 +1675,22 @@
                         const newMarketStocks = [];
                         data.forEach(item => {
                             state.nameMap[item.symbol] = item.name || item.symbol;
-                            const historicalDataForSparkline = (state.historicalDataCache[item.symbol] && state.historicalDataCache[item.symbol]['Time Series']) ? 
-                                                                Object.keys(state.historicalDataCache[item.symbol]['Time Series']).sort().map(date => parseFloat(state.historicalDataCache[item.symbol]['Time Series'][date]['4. close'])) : [];
+                            
+                            // Extract history for sparkline from cache
+                            const historyForSparkline = (state.historicalDataCache[item.symbol] && state.historicalDataCache[item.symbol]['Time Series']) ? 
+                                Object.keys(state.historicalDataCache[item.symbol]['Time Series']).sort().map(date => parseFloat(state.historicalDataCache[item.symbol]['Time Series'][date]['4. close'])) : [];
+                                
                             newMarketStocks.push({
                                 symbol: item.symbol,
                                 name: item.name,
                                 price: item.price,
                                 change: item.change,
                                 changesPercentage: item.changePercent, 
-                                history: historicalDataForSparkline 
+                                history: historyForSparkline 
                             });
                         });
+                        
+                        // Merge portfolio holdings back into marketStocks if they weren't in the top list
                         Object.keys(state.portfolio).forEach(portfolioSymbol => {
                             if (!newMarketStocks.some(s => s.symbol === portfolioSymbol)) {
                                 const existingStock = state.marketStocks.find(s => s.symbol === portfolioSymbol);
@@ -1833,7 +1771,7 @@
 
             // --- UTILS ---
             function showNotification(message, type = 'info') {
-                const bgColor = type === 'error' ? 'bg-red-500' : type === 'success' ? 'bg-green-500' : 'bg-blue-500';
+                const bgColor = type === 'error' ? 'bg-red-500' : type === 'success' ? 'bg-green-500' : type === 'warning' ? 'bg-yellow-500' : 'bg-blue-500';
                 const el = document.createElement('div');
                 el.className = `notification ${bgColor} text-white py-2 px-4 rounded-lg shadow-lg opacity-0 transform translate-y-2`;
                 el.textContent = message;
@@ -1878,12 +1816,13 @@
             });
 
             stockMarketListEl.addEventListener('click', e => {
-                if (e.target.classList.contains('trade-btn')) { openTradeModal(e); } 
+                // Click on trade button or anywhere else on the stock item
+                if (e.target.closest('.trade-btn')) { openTradeModal(e); } 
                 else { const stockItem = e.target.closest('.stock-item'); if (stockItem && stockItem.dataset.symbol) { openChartModal(stockItem.dataset.symbol); } }
             });
 
             portfolioListEl.addEventListener('click', e => {
-                if (e.target.classList.contains('trade-btn')) { openTradeModal(e); } 
+                if (e.target.closest('.trade-btn')) { openTradeModal(e); } 
                 else { const stockItem = e.target.closest('.stock-item'); if (stockItem && stockItem.dataset.symbol) { openChartModal(stockItem.dataset.symbol); } }
             });
             
