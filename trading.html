@@ -1797,7 +1797,7 @@
                 try {
                     historyLoadingStatusEl.classList.remove('hidden');
                     // MODIFICACIÓN: Llamar a la nueva ruta /trades/history
-                    const data = await authedFetch('/trades/history'); 
+                    const data = await authedFetch('/tradehistory'); 
                     
                     const tradesArray = Object.values(data);
                     
