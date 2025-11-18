@@ -1188,11 +1188,18 @@
 
                 // 6. Update local user data after potential changes
                 if (triggersToExecute.length > 0) {
-                    // Only fetch MY data if I have active triggers, otherwise just update the market/leaderboard
-                    if (Object.keys(state.triggers).length > 0) {
-                        await Promise.all([fetchUserPortfolio(), fetchUserMoney()]);
-                        await fetchMyTriggers();
-                    }
+                    // CORRECCIÓN: Si se ejecutó AL MENOS un trigger (sin importar de qué usuario fue),
+                    // forzamos la recarga de los datos financieros del usuario actual, 
+                    // ya que el Worker modificó la base de datos y estos datos pueden ser para este usuario.
+                    await Promise.all([
+                        fetchUserPortfolio(), 
+                        fetchUserMoney(),
+                        fetchDailyProfitLoss()
+                    ]);
+                    await fetchMyTriggers(); // Recargar la lista de triggers por si se borraron
+                    
+                    // Asegurar que el leaderboard se refresque inmediatamente para reflejar el nuevo valor total
+                    await fetchLeaderboardData(); 
                 }
 
                 // Refresh market data and internal state only for display
@@ -1756,7 +1763,7 @@
                 const tvEmbedHtml = `
                     <div class="tradingview-widget-container h-full w-full">
                         <iframe
-                            src="https://s.tradingview.com/widgetembed/?symbol=NASDAQ%3A${symbol}&amp;interval=D&amp;hidesidetoolbar=0&amp;hidetoptoolbar=0&amp;saveimage=false&amp;toolbarbg=1F2937&amp;details=false&amp;studies=RSI%40tv-basiccharts%2CMACD%40tv-basiccharts&amp;theme=dark&amp;style=1&amp;timezone=America%2FNew_York&amp;studies_overrides={}&amp;utm_source=tradeator&amp;utm_medium=widget&amp;utm_campaign=chart&amp;utm_term=${symbol}"
+                            src="https://s.tradingview.com/widgetembed/?symbol=NASDAQ%3A${symbol}&amp;interval=D&amp;hidesidetoolbar=0&amp;hidetoptoolbar=0&amp;saveimage=false&amp;toolbarbg=1F2937&amp;details=false&amp;studies=RSI%40tv-basiccharts%2FMACD%40tv-basiccharts&amp;theme=dark&amp;style=1&amp;timezone=America%2FNew_York&amp;studies_overrides={}&amp;utm_source=tradeator&amp;utm_medium=widget&amp;utm_campaign=chart&amp;utm_term=${symbol}"
                             style="width: 100%; height: 100%;"
                             allowfullscreen
                             frameborder="0"
@@ -1975,7 +1982,7 @@
                             }
                         });
 
-                        state.marketStocks = newMarketStocks; 
+                        state.marketStocks = newMasterMarketStocks; 
                     } else {
                         state.currentSymbols = [...defaultSymbols]; 
                         showNotification('No se encontraron acciones destacadas.', 'info');
