@@ -5,337 +5,1841 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tradeator</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
-    
-    <style>
-        :root {
-            --color-primary: #111827;
-            --color-secondary: #1f2937;
-            --color-accent-start: #10b981;
-            --color-accent-end: #06b6d4;
-            --text-primary: #f9fafb;
-            --text-secondary: #9ca3af;
-        }
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
+    <!-- Web App Manifest para Android (Chrome) -->
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#111827"> <!-- Color de la barra de herramientas del navegador -->
+
+    <!-- Iconos para PWA y Android -->
+    <link rel="icon" type="image/png" sizes="192x192" href="https://weberia.neocities.org/stock.png" purpose="any maskable">
+    <link rel="icon" type="image/png" sizes="512x512" href="https://weberia.neocities.org/stock.png" purpose="any maskable">
+
+    <!-- iOS (Apple-specific meta tags) -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Tradeator">
+    <!-- Iconos para iOS (Apple Touch Icons) -->
+    <link rel="apple-touch-icon" href="https://weberia.neocities.org/stock.png">
+    <link rel="apple-touch-icon" sizes="152x152" href="https://weberia.neocities.org/stock.png">
+    <link rel="apple-touch-icon" sizes="167x167" href="https://weberia.neocities.org/stock.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="https://weberia.neocities.org/stock.png">
+
+
+    <style>
         body {
             font-family: 'Inter', sans-serif;
-            background-color: var(--color-primary);
-            color: var(--text-primary);
+            background-color: #111827;
+            color: #F9FAFB;
+        }
+        .stock-up { color: #22C55E; }
+        .stock-down { color: #EF4444; }
+        .profit { color: #22C55E; }
+        .loss { color: #EF4444; }
+        .modal-backdrop { background-color: rgba(0, 0, 0, 0.75); }
+        .loader {
+            border: 4px solid #4B5563;
+            border-top: 4px solid #3B82F6;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        #auth-view, #main-app-view { transition: opacity 0.5s ease-in-out; }
+        .notification {
+            transition: opacity 0.5s, transform 0.5s;
         }
 
-        .hero-section {
-            position: relative;
-            overflow: hidden;
+        /* Leaderboard specific styles */
+        .leaderboard-first-place {
+            background-color: #FFD700 !important; /* Gold */
+            color: #000000 !important; /* Black text */
+            font-weight: bold;
         }
 
-        #heroVideo {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            min-width: 100%;
-            min-height: 100%;
-            width: auto;
-            height: auto;
-            z-index: -2;
-            transform: translateX(-50%) translateY(-50%);
-            background-size: cover;
+        .leaderboard-your-entry {
+            background-color: #FFFF00 !important; /* Yellow highlight */
+            color: #000000 !important; /* Black text for readability on yellow */
         }
 
-        .hero-overlay {
-            position: absolute;
+        /* Global Loading Overlay Styles */
+        #global-loading-overlay {
+            position: fixed;
             top: 0;
             left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: rgba(17, 24, 39, 0.75);
-            z-index: -1;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(17, 24, 39, 0.95); /* Semi-transparent dark background */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000; /* Ensure it's on top of everything */
+            transition: opacity 0.3s ease-in-out;
+            opacity: 0; /* Start hidden */
+            visibility: hidden; /* Start hidden */
         }
-        
-        .text-gradient {
-            background: linear-gradient(90deg, var(--color-accent-start), var(--color-accent-end));
-            -webkit-background-clip: text;
-            background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-
-        .cta-button {
-            position: relative;
-            background: linear-gradient(90deg, var(--color-accent-start), var(--color-accent-end));
-            transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
-            box-shadow: 0 4px 15px rgba(6, 182, 212, 0.2), 0 2px 5px rgba(16, 185, 129, 0.2);
-        }
-        .cta-button:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 25px rgba(6, 182, 212, 0.4), 0 5px 10px rgba(16, 185, 129, 0.4);
-        }
-
-        .glass-card {
-            background-color: rgba(31, 41, 55, 0.4);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            transition: all 0.4s ease;
-            position: relative;
-            overflow: hidden;
-        }
-        
-        .glass-card:before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: radial-gradient(circle at var(--x, 50%) var(--y, 50%), rgba(255, 255, 255, 0.1), transparent 40%);
-            opacity: 0;
-            transition: opacity 0.5s;
-        }
-        
-        .glass-card:hover:before {
+        #global-loading-overlay.visible {
             opacity: 1;
+            visibility: visible;
         }
 
-        .glass-card:hover {
-            transform: translateY(-10px);
-            border-color: rgba(6, 182, 212, 0.5);
+        /* Chart Modal specific styles */
+        .chart-loader {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3498db;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
         }
         
-        /* Scroll Animations */
-        .scroll-animate {
-            opacity: 0;
-            transform: translateY(30px);
-            transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+        /* Filter button styles */
+        .filter-btn {
+            background-color: #374151; /* gray-700 */
+            color: #D1D5DB; /* gray-300 */
+            transition: background-color 0.2s, color 0.2s;
         }
-        .scroll-animate.visible {
-            opacity: 1;
-            transform: translateY(0);
+        .filter-btn:hover {
+            background-color: #4B5563; /* gray-600 */
         }
-        
+        .filter-btn.active {
+            background-color: #3B82F6; /* blue-500 */
+            color: #FFFFFF; /* white */
+            font-weight: 600;
+        }
+
+        /* NEW Tab styles */
+        .tab-btn {
+            background-color: transparent;
+            color: #9CA3AF; /* gray-400 */
+            border-bottom: 2px solid transparent;
+            transition: color 0.2s, border-color 0.2s;
+        }
+        .tab-btn.active {
+            color: #3B82F6; /* blue-500 */
+            border-bottom-color: #3B82F6;
+            font-weight: 600;
+        }
     </style>
 </head>
-<body class="bg-gray-900 text-gray-200">
+<body class="bg-gray-900 text-gray-100">
 
-    <!-- Header -->
-    <header class="absolute top-0 left-0 right-0 z-20 p-4 bg-transparent">
-        <div class="container mx-auto flex justify-between items-center">
-            <h1 class="text-3xl font-bold text-white">Trade<span class="text-gradient">ator</span></h1>
-            <nav class="hidden md:flex space-x-8 items-center text-lg">
-                <a href="#features" class="hover:text-cyan-400 transition-colors duration-300">Características</a>
-                <a href="#testimonials" class="hover:text-cyan-400 transition-colors duration-300">Testimonios</a>
-                <!-- Enlace actualizado con la clase 'cta-tradeator' -->
-                <a href="trading.html" class="bg-gray-700/50 hover:bg-gray-600/50 text-white font-semibold py-2 px-5 rounded-lg transition-colors border border-gray-600 cta-tradeator">
-                    Iniciar Sesión
-                </a>
-            </nav>
-            <div class="md:hidden">
-                <!-- Mobile menu button -->
-                <button class="text-white">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7" />
-                    </svg>
-                </button>
-            </div>
-        </div>
-    </header>
+    <!-- Global Loading Overlay -->
+    <div id="global-loading-overlay">
+        <div class="loader"></div>
+        <p class="text-white text-lg mt-4">Cargando...</p>
+    </div>
 
-    <!-- Hero Section -->
-    <main>
-        <section class="hero-section min-h-screen flex items-center justify-center text-center px-4 pt-20">
-            <video autoplay muted loop playsinline id="heroVideo">
-                <source src="vid.mp4" type="video/mp4">
-                Tu navegador no soporta vídeos HTML5.
-            </video>
-            <div class="hero-overlay"></div>
-            <div class="container mx-auto z-10 relative">
-                <h2 class="text-4xl md:text-6xl font-black text-white leading-tight mb-4">
-                    Domina el Arte de Invertir <br class="hidden md:block"> <span class="text-gradient">Sin Arriesgar tu Dinero</span>
-                </h2>
-                <p class="text-lg md:text-xl text-gray-300 max-w-3xl mx-auto mb-8">
-                    Tradeator es el simulador definitivo que te prepara para el mundo real de la bolsa. Aprende, practica y conviértete en un inversor experto.
+    <!-- Authentication View -->
+    <div id="auth-view" class="min-h-screen flex items-center justify-center">
+        <div class="w-full max-w-md p-8 space-y-8 bg-gray-800 rounded-lg shadow-lg">
+            <div>
+                <h2 id="auth-title" class="text-center text-3xl font-extrabold text-white">Tradeator</h2>
+                <p class="mt-2 text-center text-sm text-gray-400">
+                    O <a href="#" id="toggle-auth-mode" class="font-medium text-blue-400 hover:text-blue-300">crea una cuenta nueva</a>
                 </p>
-                
-                <div class="flex flex-col sm:flex-row justify-center space-y-4 sm:space-y-0 sm:space-x-4">
-                    <!-- Botón Principal: Empezar Ahora -->
-                    <a href="trading.html" class="cta-button inline-block text-white font-bold text-lg py-4 px-10 rounded-lg cta-tradeator">
-                        Empezar Ahora
-                    </a>
-                </div>
-                
-                <p class="mt-4 text-sm text-gray-500">Gratis · No se requiere tarjeta de crédito</p>
             </div>
-        </section>
-    </main>
-
-    <!-- Features Section -->
-    <section id="features" class="py-24 bg-primary">
-        <div class="container mx-auto px-4">
-            <div class="text-center mb-16 scroll-animate">
-                <h3 class="text-4xl md:text-5xl font-bold text-white">¿Por qué <span class="text-gradient">Tradeator</span>?</h3>
-                <p class="text-gray-400 mt-3 text-lg">Las herramientas que usan los profesionales, a tu alcance.</p>
-            </div>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-                <!-- Feature 1 -->
-                <div class="glass-card p-8 rounded-2xl text-center scroll-animate" style="transition-delay: 100ms;">
-                    <div class="mb-5 inline-block p-4 bg-gray-800 rounded-full">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+            <form id="auth-form" class="space-y-6">
+                <input type="hidden" name="remember" value="true">
+                <div class="rounded-md shadow-sm -space-y-px">
+                    <div>
+                        <label for="username" class="sr-only">Usuario</label>
+                        <input id="username" name="username" type="text" required class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-700 bg-gray-900 placeholder-gray-500 text-gray-200 rounded-t-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm" placeholder="Usuario">
                     </div>
-                    <h4 class="text-2xl font-bold text-white mb-2">Datos en Tiempo Real</h4>
-                    <p class="text-gray-400">Opera con precios de acciones y activos reales de los mercados más importantes del mundo.</p>
-                </div>
-                <!-- Feature 2 -->
-                <div class="glass-card p-8 rounded-2xl text-center scroll-animate" style="transition-delay: 200ms;">
-                    <div class="mb-5 inline-block p-4 bg-gray-800 rounded-full">
-                           <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                    <div>
+                        <label for="password" class="sr-only">Contraseña</label>
+                        <input id="password" name="password" type="password" required class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-700 bg-gray-900 placeholder-gray-500 text-gray-200 rounded-b-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-blue-500" placeholder="Contraseña">
                     </div>
-                    <h4 class="text-2xl font-bold text-white mb-2">Riesgo Cero</h4>
-                    <p class="text-gray-400">Experimenta con estrategias de inversión y aprende de tus errores sin arriesgar ni un céntimo.</p>
                 </div>
-                <!-- Feature 3 -->
-                <div class="glass-card p-8 rounded-2xl text-center scroll-animate" style="transition-delay: 300ms;">
-                    <div class="mb-5 inline-block p-4 bg-gray-800 rounded-full">
-                           <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
-                    </div>
-                    <h4 class="text-2xl font-bold text-white mb-2">Análisis Profesional</h4>
-                    <p class="text-gray-400">Utiliza indicadores técnicos y gráficos avanzados para tomar decisiones informadas, como en una plataforma real.</p>
+                <div>
+                    <button type="submit" id="auth-submit-button" class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-blue-500">
+                        <span class="absolute left-0 inset-y-0 flex items-center pl-3">
+                            <svg class="h-5 w-5 text-blue-500 group-hover:text-blue-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd" />
+                            </svg>
+                        </span>
+                        <!-- Initial button text will be set by JS based on isLoginMode -->
+                        <span id="auth-button-text">Iniciar Sesión</span>
+                    </button>
                 </div>
-            </div>
+            </form>
         </div>
-    </section>
+    </div>
 
-    <!-- Testimonials Section -->
-    <section id="testimonials" class="py-24" style="background: var(--color-secondary);">
-        <div class="container mx-auto px-4">
-            <div class="text-center mb-16 scroll-animate">
-                <h3 class="text-4xl md:text-5xl font-bold text-white">La voz de la <span class="text-gradient">Comunidad</span></h3>
-                <p class="text-gray-400 mt-3 text-lg">Historias de éxito de nuestros traders.</p>
-            </div>
+    <!-- Main App View (hidden by default) -->
+    <div id="main-app-view" class="hidden">
+
+        <div class="container mx-auto p-4 md:p-8">
+            <header class="flex flex-col md:flex-row justify-between items-center mb-8 pb-4 border-b border-gray-700">
+                <div>
+                    <h1 class="text-3xl md:text-4xl font-bold text-white">Tradeator</h1>
+                    <p id="welcome-message" class="text-gray-400">Bienvenido, ...</p>
+                </div>
+                <!-- REESTRUCTURACIÓN: Agrupación de contador y valor -->
+                <div class="flex items-center space-x-4 mt-4 md:mt-0">
+                    <!-- NEW: NASDAQ Market Timer (Columna izquierda del boceto) -->
+                    <div class="w-48 text-center bg-gray-800 p-4 rounded-lg shadow-lg">
+                        <h2 id="timer-status" class="text-lg font-semibold text-gray-400">🟠 Nasdaq: Cargando...</h2>
+                        <p id="timer-display" class="text-4xl font-bold text-orange-500 mt-1">--</p>
+                    </div>
+
+                    <!-- Valor Total del Portafolio (Columna derecha del boceto) -->
+                    <div class="w-48 text-center bg-gray-800 p-4 rounded-lg shadow-lg">
+                        <h2 class="text-lg font-semibold text-gray-400">Valor Total del Portafolio</h2>
+                        <p id="total-value" class="text-3xl font-bold text-white">$1,000.00</p>
+                        <!-- Daily Profit/Loss Section -->
+                        <div id="daily-profit-loss" class="mt-2 text-sm">
+                            <!-- Daily P&L will be rendered here by JS -->
+                        </div>
+                    </div>
+
+                    <button id="logout-button" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg transition-colors">
+                        Salir
+                    </button>
+                </div>
+            </header>
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <!-- Testimonial 1 -->
-                <div class="glass-card p-8 rounded-2xl flex flex-col scroll-animate" style="transition-delay: 100ms;">
-                    <p class="text-gray-300 text-lg flex-grow leading-relaxed">"Tradeator cambió mi forma de ver la inversión. Pude probar mis teorías sin miedo a perder. ¡Cuando empecé a invertir de verdad ya tenía la confianza que necesitaba!"</p>
-                    <div class="mt-6 flex items-center">
-                        <img src="https://placehold.co/50x50/10b981/f9fafb?text=CA" class="rounded-full" alt="Foto de usuario">
-                        <div class="ml-4">
-                            <p class="font-bold text-white text-lg">Carlos Álvarez</p>
-                            <p class="text-sm text-gray-400">Inversor Principiante</p>
-                        </div>
+                <div class="lg:col-span-2 bg-gray-800/50 rounded-lg p-6 shadow-2xl">
+                    <!-- NEW: Tabs for Market and Triggers -->
+                    <div class="flex space-x-4 border-b border-gray-700 mb-4">
+                        <button id="tab-market" class="tab-btn py-2 px-4 text-lg active">Mercado</button>
+                        <button id="tab-triggers" class="tab-btn py-2 px-4 text-lg">Programaciones</button>
                     </div>
-                </div>
-                <!-- Testimonial 2 -->
-                <div class="glass-card p-8 rounded-2xl flex flex-col scroll-animate" style="transition-delay: 200ms;">
-                    <p class="text-gray-300 text-lg flex-grow leading-relaxed">"La mejor herramienta educativa. Los datos en tiempo real son clave, es como operar en el mercado real pero con una red de seguridad. Lo recomiendo a todos mis alumnos."</p>
-                    <div class="mt-6 flex items-center">
-                        <img src="https://placehold.co/50x50/06b6d4/f9fafb?text=LS" class="rounded-full" alt="Foto de usuario">
-                        <div class="ml-4">
-                            <p class="font-bold text-white text-lg">Laura Sánchez</p>
-                            <p class="text-sm text-gray-400">Profesora de Finanzas</p>
+
+                    <!-- Content for Market Tab -->
+                    <div id="market-content">
+                        <div class="flex justify-between items-center pb-2 mb-4">
+                            <h2 class="text-2xl font-bold">Mercado de Acciones</h2>
+                            <!-- Loader for API status -->
+                            <div id="api-status" class="flex items-center space-x-2">
+                                <div id="market-loader" class="loader hidden"></div>
+                            </div>
                         </div>
-                    </div>
-                </div>
-                <!-- Testimonial 3 -->
-                <div class="glass-card p-8 rounded-2xl flex flex-col scroll-animate" style="transition-delay: 300ms;">
-                    <p class="text-gray-300 text-lg flex-grow leading-relaxed">"La plataforma es increíblemente intuitiva. Las herramientas de análisis me han permitido entender los indicadores que usan los profesionales. ¡Es la práctica perfecta!"</p>
-                    <div class="mt-6 flex items-center">
-                        <img src="https://placehold.co/50x50/6366f1/f9fafb?text=AG" class="rounded-full" alt="Foto de usuario">
-                        <div class="ml-4">
-                            <p class="font-bold text-white text-lg">Ana García</p>
-                            <p class="text-sm text-gray-400">Day Trader en Formación</p>
+                        <div class="mb-4">
+                            <input type="text" id="search-input" placeholder="Buscar símbolo (ej. AAPL)..." class="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:outline-none">
                         </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- CTA Section -->
-    <section class="py-24 bg-primary">
-        <div class="container mx-auto px-4 text-center scroll-animate">
-             <h3 class="text-4xl md:text-5xl font-bold text-white">¿Listo para ser un <span class="text-gradient">Tradeator</span>?</h3>
-             <p class="text-gray-400 mt-4 mb-10 max-w-2xl mx-auto text-lg">Únete a miles de usuarios que ya están construyendo su futuro financiero. Tu viaje como inversor empieza aquí y ahora.</p>
-             <!-- Enlace actualizado con la clase 'cta-tradeator' -->
-             <a href="trading.html" class="cta-button inline-block text-white font-bold text-xl py-4 px-12 rounded-lg cta-tradeator">
-                 Crea tu Cuenta Gratis
-             </a>
-        </div>
-    </section>
-
-    <!-- Footer -->
-    <footer class="bg-secondary border-t border-gray-800">
-        <div class="container mx-auto py-8 px-4 flex flex-col md:flex-row justify-between items-center text-center md:text-left">
-            <p class="text-gray-500">&copy; 2025 tradeator.es. Todos los derechos reservados.</p>
-            <div class="mt-4 md:mt-0 flex space-x-6">
-                <a href="#" class="text-gray-400 hover:text-white transition-colors">Términos</a>
-                <a href="#" class="text-gray-400 hover:text-white transition-colors">Privacidad</a>
-                <a href="#" class="text-gray-400 hover:text-white transition-colors">Contacto</a>
-            </div>
-        </div>
-    </footer>
-    
-    <script>
-        // JS for scroll animations
-        const animatedElements = document.querySelectorAll('.scroll-animate');
-
-        const observer = new IntersectionObserver((entries) => {
-            entries.forEach(entry => {
-                if (entry.isIntersecting) {
-                    entry.target.classList.add('visible');
-                }
-            });
-        }, {
-            threshold: 0.1
-        });
-
-        animatedElements.forEach(el => observer.observe(el));
-        
-        // JS for glass card hover effect
-        document.querySelectorAll('.glass-card').forEach(card => {
-            card.addEventListener('mousemove', e => {
-                const rect = card.getBoundingClientRect();
-                const x = e.clientX - rect.left;
-                const y = e.clientY - rect.top;
-                card.style.setProperty('--x', `${x}px`);
-                card.style.setProperty('--y', `${y}px`);
-            });
-        });
-
-        // === SCRIPT DE REDIRECCIÓN (EXISTENTE) ===
-        // 1. Escuchamos cuando el DOM esté listo
-        document.addEventListener('DOMContentLoaded', function() {
-            
-            // 2. Buscamos TODOS los botones que deben llevar a la app
-            const tradeLinks = document.querySelectorAll('.cta-tradeator');
-
-            // 3. Añadimos un escuchador de 'click' a cada uno
-            tradeLinks.forEach(link => {
-                link.addEventListener('click', function(event) {
-                    // 4. Prevenimos que el enlace funcione de forma normal
-                    event.preventDefault(); 
-                    
-                    let destinationUrl = 'short.html'; // Destino por defecto: la explicación
-
-                    try {
-                        // 5. Comprobamos el localStorage
-                        const hasSeen = localStorage.getItem('hasSeenSell');
                         
-                        if (hasSeen === 'true') {
-                            // 6. Si YA lo ha visto, el destino es la app principal
-                            destinationUrl = 'trading.html';
-                        }
-                        // 7. Si es 'false' o 'null', se queda como 'short.html'
+                        <!-- Filter Buttons -->
+                        <div id="filter-container" class="flex flex-wrap gap-2 mb-4">
+                            <button class="filter-btn active py-2 px-4 rounded-md text-sm font-medium" data-filter="all">Todos</button>
+                            <button class="filter-btn py-2 px-4 rounded-md text-sm font-medium" data-filter="tech">Tecnología</button>
+                            <button class="filter-btn py-2 px-4 rounded-md text-sm font-medium" data-filter="etf">ETFs</button>
+                            <button class="filter-btn py-2 px-4 rounded-md text-sm font-medium" data-filter="toys">Juguetes</button>
+                            <button class="filter-btn py-2 px-4 rounded-md text-sm font-medium" data-filter="home">Hogar</button>
+                            <button class="filter-btn py-2 px-4 rounded-md text-sm font-medium" data-filter="finanzas">Finanzas</button>
+                            <button class="filter-btn py-2 px-4 rounded-md text-sm font-medium" data-filter="salud">Salud</button>
+                            <button class="filter-btn py-2 px-4 rounded-md text-sm font-medium" data-filter="consumo">Consumo</button>
+                            <button class="filter-btn py-2 px-4 rounded-md text-sm font-medium" data-filter="energia">Energía</button>
+                        </div>
 
-                    } catch (e) {
-                        console.error("Error al leer localStorage: ", e);
-                        // Si hay un error, por seguridad, mostramos la explicación
-                        destinationUrl = 'short.html';
+                        <!-- Top gainers/losers buttons -->
+                        <div class="flex justify-between space-x-2 mb-4">
+                            <button id="top-gainers-button" class="w-1/3 bg-green-700 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-md transition-colors">
+                                🟢⬆️
+                            </button>
+                            <button id="top-losers-button" class="w-1/3 bg-red-700 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-md transition-colors">
+                                🔴⬇️
+                            </button>
+                            <button id="can-afford-button" class="w-1/3 bg-blue-700 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-md transition-colors">
+                                Al alcance
+                            </button>
+                            <button id="ai-recommendations-button" class="w-1/4 bg-purple-700 hover:bg-purple-600 text-white font-bold py-2 px-4 rounded-md transition-colors text-xs md:text-sm">
+                                ✨IA
+                            </button>
+                        </div>
+                        <!-- Daily Summary Section -->
+                        <div id="daily-summary-section" class="bg-gray-700/50 p-4 rounded-lg mb-4">
+                            <h3 class="text-xl font-bold text-white mb-2">Resumen Diario de la Bolsa</h3>
+                            <p id="daily-summary-text" class="text-gray-300">Cargando resumen...</p>
+                            <p id="daily-summary-error" class="text-red-400 hidden">Error al cargar el resumen diario.</p>
+                        </div>
+                        <div id="stock-market-list" class="space-y-4 max-h-[55vh] overflow-y-auto pr-2"></div>
+                    </div>
+
+                    <!-- Content for Triggers Tab (Hidden by default) -->
+                    <div id="triggers-content" class="hidden">
+                        <h2 class="text-2xl font-bold mb-4">Programar Operaciones</h2>
+                        
+                        <!-- Form to create a new trigger -->
+                        <form id="create-trigger-form" class="bg-gray-900 p-4 rounded-lg mb-6 space-y-3">
+                            <h3 class="text-xl font-semibold text-white">Crear Nueva Programación</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div>
+                                    <label for="trigger-symbol" class="block text-sm font-medium text-gray-300 mb-1">Símbolo (ej. NVDA)</label>
+                                    <input type="text" id="trigger-symbol" required class="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:outline-none" placeholder="NVDA">
+                                </div>
+                                <div>
+                                    <label for="trigger-quantity" class="block text-sm font-medium text-gray-300 mb-1">Cantidad</label>
+                                    <input type="number" id="trigger-quantity" min="1" required class="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:outline-none" placeholder="10">
+                                </div>
+                            </div>
+                            <!-- Tipo de Ejecución -->
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                <div>
+                                    <label for="trigger-action" class="block text-sm font-medium text-gray-300 mb-1">Acción</label>
+                                    <select id="trigger-action" required class="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                                        <option value="sell">Vender (o Vender en Corto)</option>
+                                        <option value="buy">Comprar (o Cubrir Corto)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label for="execution-type" class="block text-sm font-medium text-gray-300 mb-1">Tipo de Ejecución</label>
+                                    <select id="execution-type" required class="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                                        <option value="price">Precio (Condicional)</option>
+                                        <option value="time">Tiempo (Programado)</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <!-- Campos Condicionales de Precio -->
+                            <div id="price-conditions" class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                <div>
+                                    <label for="trigger-condition" class="block text-sm font-medium text-gray-300 mb-1">Condición</label>
+                                    <select id="trigger-condition" class="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                                        <option value="lt">Precio Baja &lt; (Stop-Loss)</option>
+                                        <option value="gt">Precio Sube &gt; (Take-Profit)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label for="trigger-price" class="block text-sm font-medium text-gray-300 mb-1">Precio Objetivo (USD)</label>
+                                    <input type="number" id="trigger-price" step="0.01" min="0" class="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:outline-none" placeholder="150.00">
+                                </div>
+                            </div>
+                            
+                            <!-- Campos Condicionales de Tiempo -->
+                            <div id="time-conditions" class="grid grid-cols-1 md:grid-cols-2 gap-3 hidden">
+                                <div>
+                                    <label for="trigger-date" class="block text-sm font-medium text-gray-300 mb-1">Fecha de Ejecución</label>
+                                    <input type="date" id="trigger-date" class="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                                </div>
+                                <div>
+                                    <label for="trigger-time" class="block text-sm font-medium text-gray-300 mb-1">Hora de Ejecución (España, CET/CEST)</label>
+                                    <input type="time" id="trigger-time" step="60" class="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                                </div>
+                            </div>
+
+                            <button type="submit" id="trigger-submit-button" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md transition-colors">
+                                Crear Programación
+                            </button>
+                        </form>
+
+                        <!-- List of active triggers -->
+                        <h3 class="text-xl font-bold text-white mb-2">Programaciones Activas</h3>
+                        <p class="text-sm text-yellow-400 bg-yellow-900/50 p-2 rounded-md mb-4">
+                            <strong>Nota (Ejecución Centralizada):</strong> Las programaciones se guardan en Firebase. **Cualquier cliente activo de Tradeator (tú u otro usuario) que se conecte ejecutará los trades pendientes** a través del Worker, resolviendo el problema de autenticación cruzada.
+                        </p>
+                        <div id="active-triggers-list" class="space-y-3 max-h-[40vh] overflow-y-auto pr-2">
+                            <!-- Triggers will be rendered here by JS -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Column (Portfolio & Leaderboard) -->
+                <div class="bg-gray-800/50 rounded-lg p-6 shadow-2xl">
+                    <div class="mb-6">
+                        <h3 class="text-xl font-bold text-white mb-2">Efectivo Disponible</h3>
+                        <p id="cash-balance" class="text-2xl font-semibold text-green-400">$0.00</p>
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-bold text-white mb-2 border-b border-gray-700 pb-2">Tu Portafolio</h3>
+                        <div id="portfolio-list" class="space-y-4 max-h-[30vh] overflow-y-auto pr-2"></div>
+                    </div>
+                    <!-- New Leaderboard Section -->
+                    <div class="mt-8"> <!-- Add margin-top for spacing -->
+                        <h3 class="text-xl font-bold text-white mb-2 border-b border-gray-700 pb-2">Clasificación Global</h3>
+                        <div id="leaderboard-list" class="space-y-4 max-h-[25vh] overflow-y-auto pr-2">
+                            <!-- Leaderboard items will be rendered here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Trade Modal (same as before) -->
+    <div id="trade-modal" class="fixed inset-0 z-50 items-center justify-center hidden">
+        <div class="modal-backdrop fixed inset-0"></div>
+        <div class="bg-gray-800 rounded-lg shadow-xl p-6 w-11/12 md:w-1/3 max-w-lg z-10">
+            <h2 id="modal-title" class="text-2xl font-bold mb-4"></h2>
+            <div class="mb-4">
+                <label for="shares-input" class="block text-sm font-medium text-gray-300 mb-1">Cantidad de acciones:</label>
+                <input type="number" id="shares-input" min="1" class="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:ring-2 focus:ring-blue-500 focus:outline-none" placeholder="Ej: 10">
+            </div>
+            <div class="mb-4">
+                <p class="text-gray-400">Costo/Valor Total: <span id="modal-total-cost" class="font-bold text-white">$0.00</span></p>
+                <p id="cash-remaining-label" class="text-gray-400">Efectivo restante: <span id="modal-cash-remaining" class="font-bold text-white">$0.00</span></p>
+            </div>
+            <div class="flex justify-end space-x-4">
+                <button id="cancel-button" class="px-4 py-2 bg-gray-600 hover:bg-gray-500 rounded-md font-semibold">Cancelar</button>
+                <button id="confirm-button" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-md font-semibold"></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- New Chart Modal (Modified for TradingView Embed) -->
+    <div id="chart-modal" class="fixed inset-0 z-50 items-center justify-center hidden">
+        <div class="modal-backdrop fixed inset-0"></div>
+        <div class="bg-gray-800 rounded-lg shadow-xl p-6 w-11/12 md:w-1/2 max-w-2xl z-10">
+            <div class="flex justify-between items-center mb-4">
+                <h2 id="chart-modal-title" class="text-2xl font-bold text-white"></h2>
+                <button id="close-chart-modal-button" class="text-gray-400 hover:text-white text-xl font-bold">&times;</button>
+            </div>
+            <div id="chart-loader" class="chart-loader hidden"></div>
+            
+            <!-- NEW: Container for TradingView Embed -->
+            <div id="tradingview-container" class="relative w-full h-[50vh] min-h-[300px] overflow-hidden">
+                <!-- The iframe (TradingView widget) will be inserted here -->
+            </div>
+
+            <p id="chart-error-message" class="text-red-400 text-center mt-4 hidden">Error al cargar el gráfico.</p>
+        </div>
+    </div>
+
+    <!-- Notification Area -->
+    <div id="notification-area" class="fixed bottom-5 right-5 space-y-2 z-50"></div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- CONFIG & STATE ---
+            const API_BASE_URL = 'https://finances.logise1123.workers.dev';
+            const API_LIVE_VALUES_URL = 'https://finances.logise1123.workers.dev/livevalues';
+            
+            // ATENCIÓN: Debes configurar esta clave secreta en el Worker de Cloudflare
+            const WORKER_TRIGGER_SECRET = "YOUR_SUPER_SECRET_KEY_HERE_FOR_PRIVILEGED_EXECUTION";
+            
+            // --- NEW: Daily Signup Cooldown Config ---
+            const SIGNUP_COOLDOWN_KEY = 'stock_simulator_last_signup';
+            const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+            // --- END NEW CONFIG ---
+
+            const defaultSymbols = ['AAPL', 'GOOGL', 'MSFT', 'TSLA', 'AMZN', 'NVDA', 'META', 'JPM', 'V', 'NFLX'];
+
+            // NEW: Filter categories mapping
+            const filterCategories = {
+                all: [...defaultSymbols],
+                tech: ['AAPL', 'MSFT', 'GOOGL', 'NVDA', 'META', 'TSLA', 'AMD', 'INTC'],
+                etf: ['SPY', 'QQQ', 'VOO', 'VTI', 'GLD', 'SLV'],
+                toys: ['HAS', 'MAT'],
+                home: ['HD', 'LOW', 'WMT', 'TGT'],
+                finanzas: ['JPM', 'BAC', 'WFC', 'C', 'GS', 'MS'],
+                salud: ['JNJ', 'PFE', 'UNH', 'MRK', 'ABBV', 'LLY'],
+                consumo: ['PG', 'KO', 'PEP', 'MCD', 'NKE', 'COST'],
+                energia: ['XOM', 'CVX', 'SHEL', 'TTE', 'BP']
+            };
+
+            const state = {
+                authToken: null,
+                username: null,
+                cash: 0,
+                portfolio: {}, // { "AAPL": 10 }
+                marketStocks: [], // Stores all fetched stock data (price, change, history)
+                currentSymbols: [...defaultSymbols], // Symbols currently displayed in market list
+                nameMap: {}, // To store full names of symbols from search/APIs
+                currentTrade: {},
+                historicalDataCache: {}, // Used for sparklines and P/L reference
+                dailyProfitLoss: null, // New state for daily profit/loss
+                previousDayPortfolioValue: 0, // New state for previous day portfolio value
+                activeFilter: 'all', 
+                triggers: {}, // { "triggerId": { ... } } - OJO: Solo los triggers del usuario actual
+                isCheckingTriggers: false, // NEW: Flag to prevent concurrent trigger checks
+            };
+            
+            let isLoginMode = true; 
+
+            // Interval IDs for data updates
+            let marketDataInterval = null;
+            let leaderboardInterval = null;
+            let triggerCheckInterval = null; 
+            let marketTimerInterval = null; 
+            const MARKET_DATA_UPDATE_INTERVAL_MS = 3000; // Update market prices every 3 seconds
+            const LEADERBOARD_UPDATE_INTERVAL_MS = 10000; // Update leaderboard every 10 seconds
+            const TRIGGER_CHECK_INTERVAL_MS = 30000; // Check triggers every 30 seconds
+
+            // --- DOM ELEMENTS ---
+            const globalLoadingOverlay = document.getElementById('global-loading-overlay');
+            const authView = document.getElementById('auth-view');
+            const mainAppView = document.getElementById('main-app-view');
+            const authForm = document.getElementById('auth-form');
+            const authTitle = document.getElementById('auth-title');
+            const toggleAuthModeLink = document.getElementById('toggle-auth-mode');
+            const authSubmitButton = document.getElementById('auth-submit-button');
+            const authButtonText = document.getElementById('auth-button-text');
+            const logoutButton = document.getElementById('logout-button');
+            const cashBalanceEl = document.getElementById('cash-balance');
+            const totalValueEl = document.getElementById('total-value');
+            const dailyProfitLossEl = document.getElementById('daily-profit-loss');
+            const stockMarketListEl = document.getElementById('stock-market-list');
+            const portfolioListEl = document.getElementById('portfolio-list');
+            const welcomeMessageEl = document.getElementById('welcome-message');
+            const searchInputEl = document.getElementById('search-input');
+            const notificationArea = document.getElementById('notification-area');
+            const marketLoader = document.getElementById('market-loader');
+            const leaderboardListEl = document.getElementById('leaderboard-list');
+
+            const chartModal = document.getElementById('chart-modal');
+            const chartModalTitleEl = document.getElementById('chart-modal-title');
+            const closeChartModalButton = document.getElementById('close-chart-modal-button');
+            const tradingviewContainer = document.getElementById('tradingview-container'); // NEW container
+            const chartLoader = document.getElementById('chart-loader');
+            const chartErrorMessage = document.getElementById('chart-error-message');
+            
+            const dailySummaryTextEl = document.getElementById('daily-summary-text');
+            const dailySummaryErrorEl = document.getElementById('daily-summary-error');
+
+            const topGainersButton = document.getElementById('top-gainers-button');
+            const topLosersButton = document.getElementById('top-losers-button');
+            const canAffordButton = document.getElementById('can-afford-button');
+            const aiRecommendationsButton = document.getElementById('ai-recommendations-button');
+
+            const filterContainer = document.getElementById('filter-container');
+            const filterButtons = document.querySelectorAll('.filter-btn');
+
+            const tabMarket = document.getElementById('tab-market');
+            const tabTriggers = document.getElementById('tab-triggers');
+            const marketContent = document.getElementById('market-content');
+            const triggersContent = document.getElementById('triggers-content');
+
+            const createTriggerForm = document.getElementById('create-trigger-form');
+            const triggerSymbolEl = document.getElementById('trigger-symbol');
+            const triggerQuantityEl = document.getElementById('trigger-quantity');
+            const triggerActionEl = document.getElementById('trigger-action');
+            const executionTypeEl = document.getElementById('execution-type');
+            const priceConditionsEl = document.getElementById('price-conditions');
+            const timeConditionsEl = document.getElementById('time-conditions');
+            const triggerConditionEl = document.getElementById('trigger-condition');
+            const triggerPriceEl = document.getElementById('trigger-price');
+            const triggerDateEl = document.getElementById('trigger-date');
+            const triggerTimeEl = document.getElementById('trigger-time');
+            const triggerSubmitButton = document.getElementById('trigger-submit-button');
+            const activeTriggersListEl = document.getElementById('active-triggers-list');
+            
+            // Trade Modal Elements
+            const modal = document.getElementById('trade-modal');
+            const modalTitleEl = document.getElementById('modal-title');
+            const sharesInputEl = document.getElementById('shares-input');
+            const modalTotalCostEl = document.getElementById('modal-total-cost');
+            const modalCashRemainingEl = document.getElementById('modal-cash-remaining');
+            const cashRemainingLabel = document.getElementById('cash-remaining-label');
+            const cancelButtonEl = document.getElementById('cancel-button');
+            const confirmButtonEl = document.getElementById('confirm-button');
+            
+            // NEW: Market Timer Elements
+            const timerStatusEl = document.getElementById('timer-status');
+            const timerDisplayEl = document.getElementById('timer-display');
+
+
+            // --- LOADER FUNCTIONS ---
+            function showLoader() { marketLoader.classList.remove('hidden'); }
+            function hideLoader() { marketLoader.classList.add('hidden'); }
+            function showGlobalLoader() { globalLoadingOverlay.classList.add('visible'); authView.classList.add('hidden'); }
+            function hideGlobalLoader() { globalLoadingOverlay.classList.remove('visible'); }
+
+            function setButtonLoading(buttonElement, originalText, isLoading, loadingText = 'Cargando...') {
+                if (isLoading) {
+                    buttonElement.dataset.originalText = originalText;
+                    buttonElement.textContent = loadingText;
+                    buttonElement.disabled = true;
+                    buttonElement.style.opacity = '0.7';
+                } else {
+                    buttonElement.textContent = buttonElement.dataset.originalText || originalText;
+                    buttonElement.disabled = false;
+                    buttonElement.style.opacity = '1';
+                }
+            }
+
+            // --- AUTHENTICATION & INITIALIZATION ---
+            
+            async function startAppLoadingSequence() {
+                try {
+                    await initializeMainApp();
+                    hideGlobalLoader();
+                    authView.classList.add('hidden'); 
+                    mainAppView.classList.remove('hidden');
+                    mainAppView.style.opacity = '1';
+                } catch (error) {
+                    hideGlobalLoader(); 
+                    showNotification(`Error al cargar la aplicación: ${error.message}`, 'error');
+                    localStorage.removeItem('stock_simulator_token');
+                    localStorage.removeItem('stock_simulator_username');
+                    state.authToken = null;
+                    state.username = null;
+                    authView.classList.remove('hidden'); 
+                    authView.style.opacity = '1';
+                }
+            }
+
+            async function checkForSavedSession() {
+                const savedUsername = localStorage.getItem('stock_simulator_username');
+                const savedPassword = localStorage.getItem('stock_simulator_password');
+                if (savedUsername && savedPassword) {
+                    try {
+                        showGlobalLoader();
+                        const response = await fetch(`${API_BASE_URL}/login`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ username: savedUsername, password: savedPassword }),
+                        });
+                        const data = await response.json();
+                        if (!response.ok) throw new Error(data.message || 'Error en la autenticación');
+                        state.authToken = data.token;
+                        state.username = savedUsername;
+                        showNotification(`Bienvenido de nuevo, ${savedUsername}`, 'info');
+                        await startAppLoadingSequence();
+                    } catch (error) {
+                        hideGlobalLoader();
+                        localStorage.removeItem('stock_simulator_username');
+                        localStorage.removeItem('stock_simulator_password');
+                        state.authToken = null;
+                        state.username = null;
+                        authView.classList.remove('hidden');
+                        mainAppView.classList.add('hidden');
+                    }
+                } else {
+                    hideGlobalLoader();
+                    authView.classList.remove('hidden');
+                    mainAppView.classList.add('hidden');
+                }
+            }
+            
+            function toggleAuthMode(e) { /* ... */ if(e) e.preventDefault(); isLoginMode = !isLoginMode; authTitle.textContent = isLoginMode ? 'Iniciar Sesión' : 'Crear Cuenta'; authButtonText.textContent = isLoginMode ? 'Iniciar Sesión' : 'Crear Cuenta'; toggleAuthModeLink.textContent = isLoginMode ? 'crea una cuenta nueva' : 'inicia sesión con una cuenta existente'; }
+
+            async function handleAuthSubmit(e) {
+                e.preventDefault();
+                const username = authForm.username.value;
+                const password = authForm.password.value;
+                const endpoint = isLoginMode ? '/login' : '/signup';
+                const originalButtonText = authSubmitButton.textContent;
+                
+                // --- MODIFICACIÓN: Límite de creación de cuenta por día (Simulación cliente) ---
+                if (!isLoginMode) {
+                    const lastSignup = localStorage.getItem(SIGNUP_COOLDOWN_KEY);
+                    if (lastSignup && (Date.now() - parseInt(lastSignup)) < ONE_DAY_MS) {
+                        showNotification('Solo se permite una creación de cuenta por día. Inténtalo de nuevo mañana.', 'error');
+                        return; // Detener si está en cooldown
+                    }
+                }
+                // --- FIN MODIFICACIÓN ---
+
+                setButtonLoading(authSubmitButton, originalButtonText, true);
+                
+                try {
+                    const response = await fetch(`${API_BASE_URL}${endpoint}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }), });
+                    const data = await response.json();
+                    if (!response.ok) throw new Error(data.message || 'Error en la autenticación');
+                    if (isLoginMode) {
+                        state.authToken = data.token;
+                        state.username = username;
+                        localStorage.setItem('stock_simulator_username', username);
+                        localStorage.setItem('stock_simulator_password', password);
+                        showNotification('Inicio de sesión exitoso', 'success');
+                        showGlobalLoader();
+                        await startAppLoadingSequence();
+                    } else {
+                        // Si la creación fue exitosa, establecer el cooldown
+                        localStorage.setItem(SIGNUP_COOLDOWN_KEY, Date.now().toString());
+                        showNotification('Cuenta creada con éxito. Ahora inicia sesión.', 'success');
+                        toggleAuthMode();
+                    }
+                } catch (error) {
+                    showNotification(error.message, 'error');
+                } finally {
+                    setButtonLoading(authSubmitButton, originalButtonText, false);
+                }
+            }
+
+            function handleLogout() {
+                if (marketDataInterval) clearInterval(marketDataInterval);
+                if (leaderboardInterval) clearInterval(leaderboardInterval);
+                if (triggerCheckInterval) clearInterval(triggerCheckInterval);
+                if (marketTimerInterval) clearInterval(marketTimerInterval); 
+                marketDataInterval = null; leaderboardInterval = null; triggerCheckInterval = null; marketTimerInterval = null;
+                localStorage.removeItem('stock_simulator_username'); localStorage.removeItem('stock_simulator_password');
+                state.authToken = null; state.username = null; state.portfolio = {}; state.cash = 0; 
+                state.historicalDataCache = {};
+                state.dailyProfitLoss = null; state.previousDayPortfolioValue = 0;
+                state.activeFilter = 'all'; state.triggers = {}; 
+                mainAppView.style.opacity = '0';
+                setTimeout(() => { mainAppView.classList.add('hidden'); authView.classList.remove('hidden'); authView.style.opacity = '1'; }, 500);
+            }
+
+            async function authedFetch(endpoint, options = {}) {
+                const headers = { ...options.headers, 'Authorization': `Bearer ${state.authToken}`, 'Content-Type': 'application/json', };
+                const response = await fetch(`${API_BASE_URL}${endpoint}`, { ...options, headers });
+                if (!response.ok) {
+                    let errorData = {};
+                    try { errorData = await response.json(); } catch {}
+                    throw new Error(errorData.error || errorData.message || `Error en ${endpoint}`);
+                }
+                return response.json();
+            }
+
+
+            async function initializeMainApp() {
+                welcomeMessageEl.textContent = `Bienvenido, ${state.username}`;
+                updateFilterButtons(); 
+                await fetchUserMoney();
+                await fetchUserPortfolio();
+                await fetchMyTriggers();
+                
+                await fetchHistoricalDataAndInitialMarket(); 
+
+                if (marketDataInterval) clearInterval(marketDataInterval);
+                if (leaderboardInterval) clearInterval(leaderboardInterval);
+                if (triggerCheckInterval) clearInterval(triggerCheckInterval); 
+                if (marketTimerInterval) clearInterval(marketTimerInterval); 
+
+                marketDataInterval = setInterval(updateLiveMarketData, MARKET_DATA_UPDATE_INTERVAL_MS);
+                leaderboardInterval = setInterval(fetchLeaderboardData, LEADERBOARD_UPDATE_INTERVAL_MS);
+                triggerCheckInterval = setInterval(checkAllUserTriggers, TRIGGER_CHECK_INTERVAL_MS);
+                marketTimerInterval = setInterval(updateMarketTimerDisplay, 1000); 
+
+                // Run initial display update
+                updateMarketTimerDisplay();
+                
+                await Promise.all([
+                    fetchLeaderboardData(),
+                    fetchDailyProfitLoss(),
+                ]);
+                
+                fetchDailySummary();
+            }
+
+            async function fetchUserMoney() {
+                try {
+                    const data = await authedFetch('/money');
+                    state.cash = data.cash;
+                    cashBalanceEl.textContent = `$${state.cash.toFixed(2)}`;
+                } catch (error) {
+                    showNotification(`Error al cargar efectivo: ${error.message}`, 'error');
+                }
+            }
+
+            async function fetchUserPortfolio() {
+                try {
+                    const data = await authedFetch('/trades');
+                    state.portfolio = data || {};
+                } catch (error) {
+                    state.portfolio = {};
+                    showNotification(`Error al cargar portafolio: ${error.message}`, 'error');
+                }
+            }
+            
+            function updateTotalValue() {
+                let portfolioValue = 0;
+                for (const symbol in state.portfolio) {
+                    const quantity = state.portfolio[symbol];
+                    const stockData = state.marketStocks.find(s => s.symbol === symbol);
+                    if (stockData) {
+                        // Valuation is (price * quantity)
+                        portfolioValue += stockData.price * quantity;
+                    }
+                }
+                const totalValue = state.cash + portfolioValue;
+                totalValueEl.textContent = `$${totalValue.toFixed(2)}`;
+                
+                document.title = `$${totalValue.toFixed(2)} | Tradeator`;
+            }
+            
+            // --- MARKET TIMER FUNCTIONS ---
+
+            function getNewYorkTime() {
+                try {
+                    const nyTimeString = new Date().toLocaleString("en-US", { timeZone: "America/New_York" });
+                    return new Date(nyTimeString);
+                } catch (e) {
+                    console.error("Error al obtener hora de NY, usando fallback:", e);
+                    return new Date(); 
+                }
+            }
+
+            function calculateMarketTime() {
+                const nowNY = getNewYorkTime();
+                const currentDay = nowNY.getDay(); // 0=Sun, 6=Sat
+
+                const NASDAQ_OPEN_HOUR = 9;
+                const NASDAQ_OPEN_MINUTE = 30;
+                const NASDAQ_CLOSE_HOUR = 16; // 4 PM
+
+                let nextOpen = new Date(nowNY);
+                let nextClose = new Date(nowNY);
+                
+                nextOpen.setHours(NASDAQ_OPEN_HOUR, NASDAQ_OPEN_MINUTE, 0, 0);
+                nextClose.setHours(NASDAQ_CLOSE_HOUR, 0, 0, 0);
+
+                let statusText = 'Cerrado';
+                let targetTime = null;
+
+                if (currentDay === 0 || currentDay === 6) {
+                    nextOpen.setDate(nextOpen.getDate() + (currentDay === 0 ? 1 : 2));
+                    statusText = 'Apertura del NASDAQ';
+                    targetTime = nextOpen;
+                } else {
+                    const nowMinutes = nowNY.getHours() * 60 + nowNY.getMinutes();
+                    const openMinutes = NASDAQ_OPEN_HOUR * 60 + NASDAQ_OPEN_MINUTE;
+                    const closeMinutes = NASDAQ_CLOSE_HOUR * 60;
+
+                    if (nowMinutes < openMinutes) {
+                        statusText = 'Apertura del NASDAQ';
+                        targetTime = nextOpen;
+                    } else if (nowMinutes >= openMinutes && nowMinutes < closeMinutes) {
+                        statusText = 'Cierre del NASDAQ';
+                        targetTime = nextClose;
+                    } else {
+                        statusText = 'Apertura del NASDAQ';
+                        
+                        if (currentDay === 5) {
+                            nextOpen.setDate(nextOpen.getDate() + 3); // 3 days for Mon
+                        } else {
+                            nextOpen.setDate(nextOpen.getDate() + 1); // 1 day for next weekday
+                        }
+                        nextOpen.setHours(NASDAQ_OPEN_HOUR, NASDAQ_OPEN_MINUTE, 0, 0);
+                        targetTime = nextOpen;
+                    }
+                }
+
+                const remainingMs = targetTime ? targetTime.getTime() - nowNY.getTime() : 0;
+                
+                const totalSeconds = Math.max(0, Math.floor(remainingMs / 1000));
+                const hours = Math.floor(totalSeconds / 3600);
+                const minutes = Math.floor((totalSeconds % 3600) / 60);
+                const seconds = totalSeconds % 60;
+
+                const remainingTimeHms = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+
+                return { statusText, remainingTimeHms, totalSeconds };
+            }
+
+            function updateMarketTimerDisplay() {
+                const { statusText, remainingTimeHms } = calculateMarketTime();
+                timerStatusEl.textContent = statusText;
+                timerDisplayEl.innerHTML = `<span class="text-orange-500">${remainingTimeHms}</span>`;
+            }
+            
+            // --- TRIGGER FUNCTIONS ---
+
+            async function fetchMyTriggers() {
+                try {
+                    const data = await authedFetch('/triggers', { method: 'GET' });
+                    state.triggers = data || {};
+                    renderTriggers();
+                } catch (error) {
+                    state.triggers = {};
+                    showNotification(`Error al cargar tus programaciones: ${error.message}`, 'error');
+                }
+            }
+
+            function renderTriggers() {
+                activeTriggersListEl.innerHTML = '';
+                if (Object.keys(state.triggers).length === 0) {
+                    activeTriggersListEl.innerHTML = `<p class="text-gray-400">No tienes programaciones activas.</p>`;
+                    return;
+                }
+
+                for (const triggerId in state.triggers) {
+                    const trigger = state.triggers[triggerId];
+                    let conditionText = '';
+                    let conditionColor = '';
+                    let details = '';
+
+                    const actionText = trigger.action === 'sell' ? 'Vender' : 'Comprar';
+                    const actionColor = trigger.action === 'sell' ? 'text-red-400' : 'text-green-400';
+
+                    if (trigger.executionType === 'price') {
+                        conditionText = trigger.condition === 'lt' ? 'baja a menos de' : 'sube a más de';
+                        conditionColor = trigger.condition === 'lt' ? 'text-red-400' : 'text-green-400';
+                        details = `Si Precio <span class="${conditionColor}">${conditionText} $${trigger.targetPrice.toFixed(2)}</span>`;
+                    } else if (trigger.executionType === 'time') {
+                        conditionText = 'programada para';
+                        conditionColor = 'text-blue-400';
+                        details = `Ejecución <span class="${conditionColor}">${conditionText} ${trigger.date} a las ${trigger.time} (CET/CEST)</span>`;
+                    }
+
+                    const el = document.createElement('div');
+                    el.className = 'bg-gray-900 p-3 rounded-lg flex justify-between items-center';
+                    el.innerHTML = `
+                        <div>
+                            <p class="font-semibold">
+                                <span class="${actionColor}">${actionText} ${trigger.quantity}</span> de ${trigger.symbol}
+                            </p>
+                            <p class="text-sm text-gray-400">${details}</p>
+                        </div>
+                        <button data-trigger-id="${triggerId}" class="delete-trigger-btn bg-red-600 hover:bg-red-500 text-white font-bold py-1 px-3 rounded-md text-sm">
+                            Eliminar
+                        </button>
+                    `;
+                    activeTriggersListEl.appendChild(el);
+                }
+            }
+
+            function updateTriggerFormVisibility() {
+                const type = executionTypeEl.value;
+                priceConditionsEl.classList.add('hidden');
+                timeConditionsEl.classList.add('hidden');
+
+                if (type === 'price') {
+                    priceConditionsEl.classList.remove('hidden');
+                    triggerPriceEl.required = true;
+                    triggerDateEl.required = false;
+                    triggerTimeEl.required = false;
+                } else if (type === 'time') {
+                    timeConditionsEl.classList.remove('hidden');
+                    triggerPriceEl.required = false;
+                    triggerDateEl.required = true;
+                    triggerTimeEl.required = true;
+                }
+            }
+
+            async function handleCreateTrigger(e) {
+                e.preventDefault();
+                const symbol = triggerSymbolEl.value.trim().toUpperCase();
+                const quantity = parseInt(triggerQuantityEl.value);
+                const action = triggerActionEl.value;
+                const executionType = executionTypeEl.value;
+                
+                let payload = { symbol, quantity, executionType, action };
+
+                if (executionType === 'price') {
+                    payload.condition = triggerConditionEl.value;
+                    payload.targetPrice = parseFloat(triggerPriceEl.value);
+                    if (isNaN(payload.targetPrice) || payload.targetPrice <= 0) {
+                         showNotification('El precio objetivo debe ser un número positivo.', 'error'); return;
+                    }
+                } else if (executionType === 'time') {
+                    payload.date = triggerDateEl.value;
+                    payload.time = triggerTimeEl.value;
+                    if (!payload.date || !payload.time) {
+                        showNotification('Debe seleccionar fecha y hora de ejecución.', 'error'); return;
+                    }
+                }
+
+                const originalButtonText = triggerSubmitButton.textContent;
+                setButtonLoading(triggerSubmitButton, originalButtonText, true);
+
+                try {
+                    const result = await authedFetch('/triggers/add', {
+                        method: 'POST',
+                        body: JSON.stringify(payload)
+                    });
+                    state.triggers = result.triggers;
+                    renderTriggers();
+                    showNotification('Programación creada y guardada con éxito.', 'success');
+                    createTriggerForm.reset(); 
+                    updateTriggerFormVisibility();
+                } catch (error) {
+                    showNotification(`Error al crear programación: ${error.message}`, 'error');
+                } finally {
+                    setButtonLoading(triggerSubmitButton, originalButtonText, false);
+                }
+            }
+
+            async function handleDeleteTrigger(triggerId) {
+                try {
+                    const result = await authedFetch('/triggers/delete', {
+                        method: 'POST',
+                        body: JSON.stringify({ triggerId })
+                    });
+                    state.triggers = result.triggers;
+                    renderTriggers();
+                    showNotification('Programación eliminada de Firebase.', 'info');
+                    return true;
+                } catch (error) {
+                    showNotification(`Error al eliminar programación: ${error.message}`, 'error');
+                    return false;
+                }
+            }
+
+            async function checkAllUserTriggers() {
+                if (state.isCheckingTriggers) {
+                    return;
+                }
+                
+                state.isCheckingTriggers = true;
+                
+                let allTriggersData = {};
+                try {
+                    const response = await fetch(`${API_BASE_URL}/programs`);
+                    if (!response.ok) throw new Error("Error al obtener todas las programaciones.");
+                    allTriggersData = await response.json();
+                } catch (error) {
+                    console.error("Error fetching all user triggers:", error.message);
+                    state.isCheckingTriggers = false;
+                    return;
+                }
+
+                const triggersMap = {}; 
+                const symbolsToRefresh = new Set();
+                
+                for (const username in allTriggersData) {
+                    for (const triggerId in allTriggersData[username]) {
+                        const trigger = allTriggersData[username][triggerId];
+                        triggersMap[triggerId] = trigger;
+                        symbolsToRefresh.add(trigger.symbol);
+                    }
+                }
+                
+                if (symbolsToRefresh.size === 0) {
+                     state.isCheckingTriggers = false;
+                     return;
+                }
+
+                const symbolsString = Array.from(symbolsToRefresh).join(',');
+                let liveValuesData = {};
+                try {
+                    const liveValuesRes = await fetch(`${API_LIVE_VALUES_URL}/${symbolsString}`);
+                    if (liveValuesRes.ok) {
+                        const data = await liveValuesRes.json();
+                        liveValuesData = data.liveValues || {};
+                    }
+                } catch (error) {
+                    console.error("Error fetching live values for all triggers:", error.message);
+                }
+                
+                const triggersToExecute = [];
+                const now = new Date(); 
+
+                const getTriggerDateTimeLocal = (date, time) => {
+                    return new Date(`${date}T${time}:00`); 
+                };
+
+                for (const triggerId in triggersMap) {
+                    const trigger = triggersMap[triggerId];
+                    const livePrice = liveValuesData[trigger.symbol];
+                    let conditionMet = false;
+
+                    if (trigger.executionType === 'price' && livePrice !== undefined) {
+                        if (trigger.condition === 'lt' && livePrice <= trigger.targetPrice) {
+                            conditionMet = true;
+                        } else if (trigger.condition === 'gt' && livePrice >= trigger.targetPrice) {
+                            conditionMet = true;
+                        }
+                    } else if (trigger.executionType === 'time') {
+                        const triggerDateTime = getTriggerDateTimeLocal(trigger.date, trigger.time);
+                        if (now >= triggerDateTime) {
+                            conditionMet = true;
+                        }
+                    }
+
+                    if (conditionMet) {
+                        triggersToExecute.push(trigger);
+                    }
+                }
+                
+                for (const trigger of triggersToExecute) {
+                    await sendTriggerToWorkerForExecution(trigger);
+                }
+
+                if (triggersToExecute.length > 0) {
+                    if (Object.keys(state.triggers).length > 0) {
+                        await Promise.all([fetchUserPortfolio(), fetchUserMoney()]);
+                        await fetchMyTriggers();
+                    }
+                }
+
+                if (triggersToExecute.length > 0 || symbolsToRefresh.size > 0) {
+                     updateLiveMarketData(liveValuesData);
+                }
+
+                state.isCheckingTriggers = false;
+            }
+            
+            async function sendTriggerToWorkerForExecution(trigger) {
+                try {
+                    const response = await fetch(`${API_BASE_URL}/triggercheck`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            trigger: trigger, 
+                            secret: WORKER_TRIGGER_SECRET 
+                        })
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        const actionText = trigger.action === 'sell' ? 'VENDIDO' : 'COMPRADO';
+                        const priceDisplay = result.price ? ` a $${result.price.toFixed(2)}` : '';
+                        showNotification(`✅ Trigger de ${trigger.username} para ${trigger.symbol}: ${actionText}${priceDisplay}.`, 'success');
+                    } else {
+                        showNotification(`❌ Fallo al ejecutar el trigger de ${trigger.username} para ${trigger.symbol}. ${result.message}`, 'error');
                     }
                     
-                    // 8. Redirigimos al usuario al destino correcto
-                    window.location.href = destinationUrl;
+                    if (trigger.username === state.username) {
+                        await fetchMyTriggers();
+                    }
+
+                } catch (error) {
+                    console.error("Error al delegar la ejecución del trigger al Worker:", error);
+                    showNotification(`Error de conexión al intentar ejecutar el trigger de ${trigger.username}.`, 'warning');
+                }
+            }
+
+
+            // --- DATA FETCHING & RENDERING ---
+
+            async function fetchHistoricalDataAndInitialMarket() {
+                showLoader();
+                const allSymbolsToInitialize = new Set([...defaultSymbols, ...state.currentSymbols, ...Object.keys(state.portfolio), ...Object.values(state.triggers).map(t => t.symbol)]);
+                const symbolsForHistoryFetch = Array.from(allSymbolsToInitialize); 
+                
+                if (symbolsForHistoryFetch.length > 0) {
+                    try {
+                        // Fetch daily history for sparkline and P/L reference
+                        const historyRes = await fetch(`${API_BASE_URL}/history?symbol=${symbolsForHistoryFetch.join(',')}&days=10`);
+                        if (historyRes.ok) {
+                            const data = await historyRes.json();
+                            Object.assign(state.historicalDataCache, data.results || {});
+                        } else {
+                            console.warn(`Error fetching historical data: ${historyRes.statusText}`);
+                        }
+                    } catch (error) {
+                        console.error(`Error fetching historical data:`, error.message);
+                        showNotification(`Error al cargar datos históricos: ${error.message}`, 'error');
+                    }
+                }
+                const newMasterMarketStocks = [];
+                const symbolsAlreadyProcessedForMaster = new Set();
+                const combinedSymbols = new Set([...state.currentSymbols, ...Object.keys(state.portfolio), ...Object.values(state.triggers).map(t => t.symbol)]);
+                
+                for (const symbol of combinedSymbols) {
+                    if (symbolsAlreadyProcessedForMaster.has(symbol)) continue;
+                    const hist = state.historicalDataCache[symbol];
+                    let stockPrice, stockChange = 0, stockChangesPercentage = 0, stockHistory = [];
+                    let stockName = state.nameMap[symbol] || symbol;
+
+                    if (hist && hist['Time Series']) {
+                        const historyEntries = Object.entries(hist['Time Series']).sort(([dateA], [dateB]) => new Date(dateA) - new Date(dateB));
+                        stockHistory = historyEntries.map(([, data]) => parseFloat(data['4. close']));
+                        
+                        if (stockHistory.length >= 2) {
+                            const latestClose = stockHistory[stockHistory.length - 1];
+                            const previousClose = stockHistory[stockHistory.length - 2];
+                            stockChange = latestClose - previousClose;
+                            stockChangesPercentage = (previousClose !== 0) ? (stockChange / previousClose) * 100 : 0;
+                        }
+                        if (hist['Meta Data']) {
+                            stockName = hist['Meta Data']['2. Symbol'] || hist['Meta Data']['Symbol'] || stockName;
+                        }
+                    }
+                    const currentLivePriceInState = state.marketStocks.find(s => s.symbol === symbol)?.price;
+                    if (currentLivePriceInState !== undefined) { stockPrice = currentLivePriceInState; } 
+                    else if (stockHistory.length > 0) { stockPrice = stockHistory[stockHistory.length - 1]; } 
+                    else { continue; }
+
+                    newMasterMarketStocks.push({
+                        symbol: symbol, name: stockName, price: stockPrice, change: stockChange, changesPercentage: stockChangesPercentage, history: stockHistory
+                    });
+                    symbolsAlreadyProcessedForMaster.add(symbol);
+                }
+                state.marketStocks = newMasterMarketStocks; 
+                hideLoader();
+                await updateLiveMarketData(); 
+            }
+
+            async function updateLiveMarketData(externalLiveValues = {}) {
+                const symbolsToRefresh = new Set();
+                state.marketStocks.forEach(stock => symbolsToRefresh.add(stock.symbol)); 
+                Object.keys(state.portfolio).forEach(symbol => symbolsToRefresh.add(symbol));
+                Object.values(state.triggers).forEach(trigger => symbolsToRefresh.add(trigger.symbol));
+                const symbolsString = Array.from(symbolsToRefresh).join(',');
+                if (symbolsString.length === 0) { renderMarket(); renderPortfolio(); updateTotalValue(); return; }
+                let liveValuesData = externalLiveValues;
+                if (Object.keys(liveValuesData).length === 0) {
+                     try {
+                        const liveValuesRes = await fetch(`${API_LIVE_VALUES_URL}/${symbolsString}`);
+                        if (liveValuesRes.ok) {
+                            const data = await liveValuesRes.json();
+                            liveValuesData = data.liveValues || {};
+                        }
+                    } catch (error) {
+                        console.error(`Error al cargar datos de valores en vivo:`, error.message);
+                    }
+                }
+                state.marketStocks = state.marketStocks.map(stock => {
+                    const livePrice = liveValuesData[stock.symbol];
+                    if (livePrice !== undefined && livePrice !== null && !isNaN(livePrice)) {
+                        const historyForRef = state.historicalDataCache[stock.symbol]?.['Time Series'];
+                        const sortedDates = historyForRef ? Object.keys(historyForRef).sort() : [];
+                        
+                        let prevPrice = stock.price; 
+                        if (sortedDates.length >= 2) {
+                            prevPrice = parseFloat(historyForRef[sortedDates[sortedDates.length - 2]]['4. close']);
+                        } else if (stock.history && stock.history.length >= 2) {
+                            prevPrice = stock.history[stock.history.length - 2];
+                        }
+
+                        const newChange = livePrice - prevPrice;
+                        const newChangePercent = (prevPrice !== 0) ? (newChange / prevPrice) * 100 : 0;
+                        return { ...stock, price: livePrice, change: newChange, changesPercentage: newChangePercent };
+                    }
+                    return stock; 
                 });
+                renderMarket(); renderPortfolio(); updateTotalValue();
+                if (Date.now() % LEADERBOARD_UPDATE_INTERVAL_MS < MARKET_DATA_UPDATE_INTERVAL_MS) {
+                    fetchDailyProfitLoss(); fetchLeaderboardData();
+                }
+            }
+
+            function renderMarket() {
+                stockMarketListEl.innerHTML = '';
+                const stocksToDisplay = state.marketStocks.filter(stock => state.currentSymbols.includes(stock.symbol));
+
+                if(stocksToDisplay.length === 0) {
+                    stockMarketListEl.innerHTML = `<p class="text-gray-400 text-center py-4">No se encontraron acciones.</p>`;
+                    return;
+                }
+                
+                stocksToDisplay.forEach(stock => {
+                    if (!stock) return;
+                    const { symbol, name, price, change, changesPercentage, history } = stock;
+                    const changeClass = change >= 0 ? 'stock-up' : 'stock-down';
+                    const changeSign = change >= 0 ? '+' : '';
+
+                    const stockEl = document.createElement('div');
+                    stockEl.className = 'stock-item grid grid-cols-3 md:grid-cols-5 items-center bg-gray-900 p-4 rounded-lg cursor-pointer hover:bg-gray-700/50';
+                    stockEl.dataset.symbol = symbol;
+                    stockEl.innerHTML = `
+                        <div class="col-span-2 md:col-span-2">
+                            <p class="font-bold text-lg">${symbol}</p><p class="text-sm text-gray-400 truncate">${name}</p>
+                        </div>
+                        <div class="hidden md:block">${generateSparkline(history, change)}</div>
+                        <div class="text-right">
+                            <p class="font-semibold text-lg">$${price.toFixed(2)}</p>
+                            <p class="text-sm ${changeClass}">${changeSign}${change.toFixed(2)}$ (${changeSign}${changesPercentage.toFixed(2)}%)</p>
+                        </div>
+                        <!-- MODIFICACIÓN: Botones más pequeños (py-1 px-2) -->
+                        <div class="flex flex-col md:flex-row justify-end ml-2 space-y-1 md:space-y-0 md:space-x-1">
+                            <button data-symbol="${symbol}" data-type="buy" class="trade-btn text-xs font-bold bg-green-600 hover:bg-green-500 text-white py-1 px-2 rounded-md">COMPRAR</button>
+                            <button data-symbol="${symbol}" data-type="sell" class="trade-btn text-xs font-bold bg-red-600 hover:bg-red-500 text-white py-1 px-2 rounded-md">VENDER</button>
+                        </div>`;
+                    stockMarketListEl.appendChild(stockEl);
+                });
+            }
+
+            function generateSparkline(history, change) {
+                if (!history || history.length < 2) return '';
+                const width = 100;
+                const height = 30;
+                const max = Math.max(...history);
+                const min = Math.min(...history);
+                const range = max - min === 0 ? 1 : max - min; 
+
+                const points = history.map((d, i) => {
+                    const x = (i / (history.length - 1)) * width;
+                    const y = height - ((d - min) / range) * height;
+                    return `${x.toFixed(2)},${y.toFixed(2)}`;
+                }).join(' ');
+
+                const strokeColor = change >= 0 ? '#22C55E' : '#EF4444';
+
+                return `
+                    <svg viewBox="0 0 ${width} ${height}" class="w-24 h-8" preserveAspectRatio="none">
+                        <polyline fill="none" stroke="${strokeColor}" stroke-width="1.5" points="${points}" />
+                    </svg>
+                `;
+            }
+
+            function renderPortfolio() {
+                portfolioListEl.innerHTML = '';
+
+                if (Object.keys(state.portfolio).length === 0) {
+                    portfolioListEl.innerHTML = `<p class="text-gray-400">Aún no tienes acciones.</p>`;
+                    return;
+                }
+                for (const symbol in state.portfolio) {
+                    const quantity = state.portfolio[symbol];
+                    if (quantity === 0) continue; 
+
+                    const stockData = state.marketStocks.find(s => s.symbol === symbol);
+                    
+                    const currentValue = stockData ? stockData.price * quantity : 0;
+                    const priceDisplay = stockData ? `@ ${stockData.price.toFixed(2)}` : 'Cargando...';
+
+                    let stockDailyProfitLossHtml = '';
+                    if (stockData && stockData.change !== undefined && stockData.changesPercentage !== undefined) {
+                        const dailyChangeAmount = stockData.change * quantity; 
+                        const dailyChangePercentage = stockData.changesPercentage * (quantity > 0 ? 1 : -1); 
+                        const plClass = dailyChangeAmount >= 0 ? 'profit' : 'loss';
+                        const plSign = dailyChangeAmount >= 0 ? '+' : '';
+                        stockDailyProfitLossHtml = `
+                            <p class="text-sm ${plClass}">
+                                ${plSign}${dailyChangeAmount.toFixed(2)}$ (${plSign}${dailyChangePercentage.toFixed(2)}%)
+                            </p>`;
+                    }
+
+                    const posType = quantity > 0 ? 'Long' : 'Short';
+                    const posColor = quantity > 0 ? 'text-green-400' : 'text-red-400';
+                    const absQuantity = Math.abs(quantity);
+
+                    const el = document.createElement('div');
+                    el.className = 'stock-item bg-gray-900 p-4 rounded-lg cursor-pointer hover:bg-gray-700/50';
+                    el.dataset.symbol = symbol; 
+                    el.innerHTML = `
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <p class="font-bold text-lg">${symbol}</p>
+                                <p class="text-sm text-gray-400">${absQuantity} acciones (<span class="${posColor} font-semibold">${posType}</span>)</p>
+                            </div>
+                            <div class="text-right">
+                                <p class="font-semibold text-lg">$${currentValue.toFixed(2)}</p>
+                                <p class="text-sm text-gray-500">${priceDisplay}</p>
+                                ${stockDailyProfitLossHtml}
+                            </div>
+                        </div>
+                        <!-- MODIFICACIÓN: Botones más pequeños (py-1 px-2) -->
+                        <div class="mt-2 grid grid-cols-2 gap-2">
+                            <button data-symbol="${symbol}" data-type="buy" class="trade-btn w-full text-xs font-bold bg-green-600 hover:bg-green-500 text-white py-1 px-2 rounded-md">${quantity < 0 ? 'CUBRIR' : 'COMPRAR'}</button>
+                            <button data-symbol="${symbol}" data-type="sell" class="trade-btn w-full text-xs font-bold bg-red-600 hover:bg-red-500 text-white py-1 px-2 rounded-md">${quantity > 0 ? 'VENDER' : 'V. CORTO'}</button>
+                        </div>`;
+                    portfolioListEl.appendChild(el);
+                }
+            }
+
+            async function fetchLeaderboardData() {
+                try {
+                    const data = await authedFetch('/leaderboard');
+                    if (data.leaderboard && data.leaderboard.length > 0) {
+                        renderLeaderboard(data.leaderboard);
+                    } else {
+                        leaderboardListEl.innerHTML = `<p class="text-gray-400">No hay datos en la clasificación aún.</p>`;
+                    }
+                } catch (error) {
+                    showNotification(`Error al cargar la clasificación: ${error.message}`, 'error');
+                    leaderboardListEl.innerHTML = `<p class="text-gray-400">Error al cargar la clasificación.</p>`;
+                }
+            }
+
+            async function fetchDailyProfitLoss() {
+                if (!state.username) return; 
+                try {
+                    const data = await authedFetch(`/bp/${state.username}`);
+                    if (data && data.dailyProfitLoss) {
+                        state.dailyProfitLoss = data.dailyProfitLoss;
+                        state.previousDayPortfolioValue = data.previousDayPortfolioValue;
+                        renderDailyProfitLoss();
+                    }
+                } catch (error) {
+                    state.dailyProfitLoss = null; 
+                    dailyProfitLossEl.innerHTML = '';
+                    showNotification(`Error al cargar BP diario: ${error.message}`, 'error');
+                }
+            }
+
+            function renderDailyProfitLoss() {
+                if (state.dailyProfitLoss) {
+                    const { amount, percentage } = state.dailyProfitLoss;
+                    const plClass = amount >= 0 ? 'profit' : 'loss';
+                    const plSign = amount >= 0 ? '+' : '';
+                    dailyProfitLossEl.innerHTML = `
+                        <p class="font-semibold ${plClass}">
+                            BP Diario: ${plSign}${amount.toFixed(2)}$ (${plSign}${percentage.toFixed(2)}%)
+                        </p>
+                    `;
+                } else {
+                    dailyProfitLossEl.innerHTML = ''; 
+                }
+            }
+
+            function renderLeaderboard(leaderboardData) {
+                leaderboardListEl.innerHTML = ''; 
+                leaderboardData.forEach((user, index) => {
+                    let liClasses = 'bg-gray-900 p-3 rounded-lg flex justify-between items-center';
+                    
+                    if (index === 0) {
+                        liClasses += ' leaderboard-first-place'; 
+                    } else if (user.username === state.username) {
+                        liClasses += ' leaderboard-your-entry'; 
+                    }
+
+                    const el = document.createElement('div');
+                    el.className = liClasses;
+                    el.innerHTML = `
+                        <div>
+                            <p class="font-bold text-md">${index + 1}. ${user.username}</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="font-semibold text-md">$${user.totalPortfolioValue.toFixed(2)}</p>
+                        </div>
+                    `;
+                    leaderboardListEl.appendChild(el);
+                });
+            }
+
+            async function fetchDailySummary() {
+                dailySummaryTextEl.textContent = 'Cargando resumen...'; 
+                dailySummaryErrorEl.classList.add('hidden'); 
+                try {
+                    const response = await fetch(`${API_BASE_URL}/today`);
+                    if (!response.ok) {
+                        throw new Error('Error al cargar el resumen diario de la bolsa.');
+                    }
+                    const data = await response.json();
+                    if (data && data.dailySummary) {
+                        dailySummaryTextEl.textContent = data.dailySummary;
+                        dailySummaryTextEl.classList.remove('hidden'); 
+                    } else {
+                        dailySummaryTextEl.textContent = 'No hay resumen diario disponible.';
+                        dailySummaryTextEl.classList.remove('hidden');
+                    }
+                } catch (error) {
+                    console.error('Error fetching daily summary:', error);
+                    dailySummaryTextEl.classList.add('hidden'); 
+                    dailySummaryErrorEl.textContent = `Error: ${error.message}`;
+                    dailySummaryErrorEl.classList.remove('hidden'); 
+                }
+            }
+            
+            // --- TRADING & MODAL ---
+
+            // NEW: Function to check the short selling limit
+            function checkShortLimit(currentSymbol, tradeQuantity, tradePrice) {
+                const currentHolding = state.portfolio[currentSymbol] || 0;
+                const projectedHolding = currentHolding - tradeQuantity; // Sale always decreases holding
+
+                // The transaction is only a shorting risk if the resulting position is negative.
+                if (projectedHolding >= 0) {
+                    return { isAllowed: true, message: '' }; // Closing long or selling from current holdings
+                }
+
+                // 1. Calculate the projected short exposure for the current symbol
+                // This is the absolute new negative amount * price
+                const projectedSymbolShortExposure = Math.abs(projectedHolding) * tradePrice;
+
+                // 2. Calculate the existing short exposure from other symbols
+                let existingOtherShortExposure = 0;
+                for (const symbol in state.portfolio) {
+                    if (symbol !== currentSymbol) {
+                        const quantity = state.portfolio[symbol];
+                        if (quantity < 0) {
+                            const stock = state.marketStocks.find(s => s.symbol === symbol);
+                            if (stock) {
+                                // Add the absolute value of the short position
+                                existingOtherShortExposure += Math.abs(quantity) * stock.price;
+                            }
+                        }
+                    }
+                }
+
+                // 3. Total projected short exposure (absolute value)
+                const totalProjectedShortExposure = projectedSymbolShortExposure + existingOtherShortExposure;
+
+                // 4. Check against available cash (the collateral)
+                const maxAllowedShortExposure = state.cash;
+                
+                if (totalProjectedShortExposure <= maxAllowedShortExposure) {
+                    return { isAllowed: true, message: '' };
+                } else {
+                    return { 
+                        isAllowed: false, 
+                        message: `Límite de venta en corto excedido. El valor total de tus posiciones en corto proyectadas ($${totalProjectedShortExposure.toFixed(2)}) no puede superar tu efectivo disponible ($${maxAllowedShortExposure.toFixed(2)}).`
+                    };
+                }
+            }
+            
+            function openTradeModal(e) {
+                const { symbol, type } = e.target.dataset;
+                state.currentTrade = { symbol, type };
+
+                const stock = state.marketStocks.find(s => s.symbol === symbol);
+                if(!stock) {
+                    showNotification(`No se encontraron datos de precio actuales para ${symbol}. Inténtalo de nuevo más tarde.`, 'error');
+                    return;
+                }
+                
+                const currentHolding = state.portfolio[symbol] || 0;
+                let actionText = '';
+                if (type === 'buy') {
+                    actionText = (currentHolding < 0) ? `Cubrir Corto ${symbol}` : `Comprar ${symbol}`;
+                } else {
+                    actionText = (currentHolding > 0) ? `Vender ${symbol}` : `Vender en Corto ${symbol}`;
+                }
+
+                modalTitleEl.textContent = actionText;
+                confirmButtonEl.textContent = `Confirmar ${actionText.split(' ')[0]}`;
+                confirmButtonEl.className = `px-4 py-2 rounded-md font-semibold ${type === 'buy' ? 'bg-green-600 hover:bg-green-500' : 'bg-red-600 hover:bg-red-500'}`;
+                cashRemainingLabel.textContent = type === 'buy' ? 'Efectivo restante:' : 'Efectivo después:';
+
+                sharesInputEl.value = '1';
+                
+                if (type === 'buy') {
+                    sharesInputEl.max = Math.floor(state.cash / stock.price);
+                } else {
+                    sharesInputEl.removeAttribute('max');
+                }
+                
+                sharesInputEl.min = 1;
+
+                updateTradeModalCalculations();
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+            }
+
+            function updateTradeModalCalculations() {
+                const { symbol, type } = state.currentTrade;
+                const stock = state.marketStocks.find(s => s.symbol === symbol);
+                if (!stock) return;
+
+                const shares = parseInt(sharesInputEl.value) || 0;
+                const totalCost = shares * stock.price;
+                modalTotalCostEl.textContent = `$${totalCost.toFixed(2)}`;
+
+                let cashAfterTrade;
+                if (type === 'buy') {
+                    cashAfterTrade = state.cash - totalCost;
+                } else {
+                    cashAfterTrade = state.cash + totalCost;
+                }
+                modalCashRemainingEl.textContent = `$${cashAfterTrade.toFixed(2)}`;
+            }
+
+            async function performTrade(symbol, quantity, type) {
+                const endpoint = type === 'buy' ? '/trades/add' : '/trades/sell';
+                try {
+                    await authedFetch(endpoint, {
+                        method: 'POST',
+                        body: JSON.stringify({ symbol, quantity })
+                    });
+                    
+                    // Update all states
+                    await Promise.all([fetchUserPortfolio(), fetchUserMoney()]);
+                    await updateLiveMarketData(); 
+                    await fetchLeaderboardData();
+                    await fetchDailyProfitLoss();
+                    
+                    return true; // Indicate success
+                } catch (error) {
+                    showNotification(error.message, 'error');
+                    return false; // Indicate failure
+                }
+            }
+            
+            async function executeTrade() {
+                const { symbol, type } = state.currentTrade;
+                const quantity = parseInt(sharesInputEl.value);
+
+                if(!quantity || quantity <= 0) {
+                    showNotification('Introduce una cantidad válida', 'error');
+                    return;
+                }
+
+                const stock = state.marketStocks.find(s => s.symbol === symbol);
+                if (!stock) {
+                    showNotification('Datos de la acción no disponibles para la operación.', 'error');
+                    return;
+                }
+
+                const originalConfirmText = confirmButtonEl.textContent;
+                setButtonLoading(confirmButtonEl, originalConfirmText, true);
+
+                if (type === 'buy') {
+                    if (quantity * stock.price > state.cash) {
+                        showNotification('Fondos insuficientes para esta compra.', 'error');
+                        setButtonLoading(confirmButtonEl, originalConfirmText, false);
+                        return;
+                    }
+                } else if (type === 'sell') {
+                    // NEW: Short selling limit check
+                    const check = checkShortLimit(symbol, quantity, stock.price);
+                    if (!check.isAllowed) {
+                        showNotification(check.message, 'error');
+                        setButtonLoading(confirmButtonEl, originalConfirmText, false);
+                        return;
+                    }
+                }
+                
+                const tradeSuccess = await performTrade(symbol, quantity, type);
+                
+                if (tradeSuccess) {
+                     showNotification(type === 'buy' ? 'Operación de compra realizada' : 'Operación de venta realizada', 'success');
+                }
+                
+                setButtonLoading(confirmButtonEl, originalConfirmText, false);
+                closeTradeModal();
+            }
+
+            function closeTradeModal() {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }
+
+            // --- CHART MODAL FUNCTIONS (MODIFIED FOR TRADINGVIEW) ---
+            async function openChartModal(symbol) {
+                chartModalTitleEl.textContent = `Gráfico de ${symbol} (TradingView)`;
+                chartModal.classList.remove('hidden');
+                chartModal.classList.add('flex');
+                chartLoader.classList.remove('hidden');
+                chartErrorMessage.classList.add('hidden');
+
+                // Clear previous content
+                tradingviewContainer.innerHTML = '';
+                
+                // TradingView Widget HTML (Dark theme, 100% size)
+                const tvEmbedHtml = `
+                    <div class="tradingview-widget-container h-full w-full">
+                        <iframe
+                            src="https://s.tradingview.com/widgetembed/?symbol=NASDAQ%3A${symbol}&amp;interval=D&amp;hidesidetoolbar=0&amp;hidetoptoolbar=0&amp;saveimage=false&amp;toolbarbg=1F2937&amp;details=false&amp;studies=RSI%40tv-basiccharts%2CMACD%40tv-basiccharts&amp;theme=dark&amp;style=1&amp;timezone=America%2FNew_York&amp;studies_overrides={}&amp;utm_source=tradeator&amp;utm_medium=widget&amp;utm_campaign=chart&amp;utm_term=${symbol}"
+                            style="width: 100%; height: 100%;"
+                            allowfullscreen
+                            frameborder="0"
+                            loading="lazy"
+                        ></iframe>
+                    </div>
+                `;
+                
+                // Insert the iframe
+                tradingviewContainer.innerHTML = tvEmbedHtml;
+                chartLoader.classList.add('hidden');
+                
+            }
+
+            function closeChartModal() {
+                chartModal.classList.add('hidden');
+                chartModal.classList.remove('flex');
+                // Clear the iframe content to stop playback/loading
+                document.getElementById('tradingview-container').innerHTML = '';
+            }
+
+
+            // --- SEARCH & GAINERS/LOSERS ---
+            let debounceTimeout;
+            async function handleSearch(e) {
+                const query = e.target.value.trim();
+                clearTimeout(debounceTimeout);
+                
+                if (query) {
+                    state.activeFilter = null;
+                    updateFilterButtons();
+                } else if (!query && state.activeFilter === null) { 
+                    state.activeFilter = 'all';
+                    updateFilterButtons();
+                }
+
+                debounceTimeout = setTimeout(async () => {
+                    if (!query) {
+                        state.currentSymbols = filterCategories[state.activeFilter] || [...defaultSymbols];
+                    } else {
+                        try {
+                            const results = await fetch(`${API_BASE_URL}/search/${query}`);
+                            const data = await results.json();
+                            if(data && data.length > 0) {
+                                state.currentSymbols = data.map(item => item.symbol);
+                                data.forEach(item => {
+                                    state.nameMap[item.symbol] = item.name || item.symbol;
+                                });
+                            } else {
+                                state.currentSymbols = [];
+                                showNotification('No se encontraron acciones para tu búsqueda.', 'info');
+                            }
+                        } catch (error) {
+                            state.currentSymbols = [];
+                            showNotification(`Error al buscar acciones: ${error.message}`, 'error');
+                        }
+                    }
+                    await fetchHistoricalDataAndInitialMarket();
+                }, 500);
+            }
+
+            async function fetchTopStocks(endpoint, buttonElement) {
+                const originalButtonText = buttonElement.textContent;
+                setButtonLoading(buttonElement, originalButtonText, true);
+                
+                state.activeFilter = null;
+                updateFilterButtons();
+                searchInputEl.value = ''; 
+
+                try {
+                    const response = await fetch(`${API_BASE_URL}${endpoint}`); 
+                    if (!response.ok) {
+                        throw new Error('Error al cargar acciones destacadas.');
+                    }
+                    const data = await response.json(); 
+
+                    if (data && data.length > 0) {
+                        state.currentSymbols = data.map(item => item.symbol);
+                        const symbolsToFetchHistory = state.currentSymbols;
+                        
+                        if (symbolsToFetchHistory.length > 0) {
+                             try {
+                                const historyRes = await fetch(`${API_BASE_URL}/history?symbol=${symbolsToFetchHistory.join(',')}&days=10`);
+                                if (historyRes.ok) {
+                                    const historyData = await historyRes.json();
+                                    Object.assign(state.historicalDataCache, historyData.results || {});
+                                } else {
+                                    console.warn(`Error fetching historical data for top stocks: ${historyRes.statusText}`);
+                                }
+                            } catch (historyError) {
+                                console.error(`Error fetching historical data for top stocks:`, historyError.message);
+                            }
+                        }
+
+                        const newMarketStocks = [];
+                        data.forEach(item => {
+                            state.nameMap[item.symbol] = item.name || item.symbol;
+                            
+                            const historyForSparkline = (state.historicalDataCache[item.symbol] && state.historicalDataCache[item.symbol]['Time Series']) ? 
+                                Object.keys(state.historicalDataCache[item.symbol]['Time Series']).sort().map(date => parseFloat(state.historicalDataCache[item.symbol]['Time Series'][date]['4. close'])) : [];
+                                
+                            newMarketStocks.push({
+                                symbol: item.symbol,
+                                name: item.name,
+                                price: item.price,
+                                change: item.change,
+                                changesPercentage: item.changePercent, 
+                                history: historyForSparkline 
+                            });
+                        });
+                        
+                        // Merge portfolio holdings back into marketStocks if they weren't in the top list
+                        Object.keys(state.portfolio).forEach(portfolioSymbol => {
+                            if (!newMarketStocks.some(s => s.symbol === portfolioSymbol)) {
+                                const existingStock = state.marketStocks.find(s => s.symbol === portfolioSymbol);
+                                if (existingStock) {
+                                    newMarketStocks.push(existingStock);
+                                }
+                            }
+                        });
+
+                        state.marketStocks = newMarketStocks; 
+                    } else {
+                        state.currentSymbols = [...defaultSymbols]; 
+                        showNotification('No se encontraron acciones destacadas.', 'info');
+                        await fetchHistoricalDataAndInitialMarket(); 
+                        return; 
+                    }
+                    renderMarket(); 
+                    updateTotalValue(); 
+                } catch (error) {
+                    showNotification(`Error al cargar acciones: ${error.message}`, 'error');
+                    state.currentSymbols = [...defaultSymbols]; 
+                    state.marketStocks = []; 
+                    renderMarket();
+                } finally {
+                    setButtonLoading(buttonElement, originalButtonText, false);
+                }
+            }
+            
+            async function fetchTopGainers() { await fetchTopStocks('/searchhighs', topGainersButton); }
+            async function fetchTopLosers() { await fetchTopStocks('/searchlows', topLosersButton); }
+            async function fetchCanAfford() {
+                if (state.cash === undefined || state.cash === null) {
+                    showNotification('No se ha podido determinar tu efectivo disponible.', 'error');
+                    return;
+                }
+                await fetchTopStocks(`/canafford/${state.cash}`, canAffordButton);
+            }
+            async function fetchAIRecommendations() { await fetchTopStocks('/ai', aiRecommendationsButton); }
+            
+            // --- FILTER FUNCTIONS ---
+            function handleFilterClick(e) {
+                const clickedButton = e.target.closest('.filter-btn');
+                if (!clickedButton) return; 
+                const filter = clickedButton.dataset.filter;
+                if (filter === state.activeFilter) return; 
+
+                state.activeFilter = filter;
+                state.currentSymbols = filterCategories[filter] || [...defaultSymbols];
+                searchInputEl.value = '';
+                updateFilterButtons();
+                fetchHistoricalDataAndInitialMarket();
+            }
+
+            function updateFilterButtons() {
+                filterButtons.forEach(btn => {
+                    if (btn.dataset.filter === state.activeFilter) {
+                        btn.classList.add('active');
+                    } else {
+                        btn.classList.remove('active');
+                    }
+                });
+            }
+
+            // --- NEW: TAB SWITCHING ---
+            function switchTab(tab) {
+                if (tab === 'market') {
+                    tabMarket.classList.add('active');
+                    tabTriggers.classList.remove('active');
+                    marketContent.classList.remove('hidden');
+                    triggersContent.classList.add('hidden');
+                } else if (tab === 'triggers') {
+                    tabMarket.classList.remove('active');
+                    tabTriggers.classList.add('active');
+                    marketContent.classList.add('hidden');
+                    triggersContent.classList.remove('hidden');
+                }
+            }
+
+            // --- UTILS ---
+            function showNotification(message, type = 'info') {
+                const bgColor = type === 'error' ? 'bg-red-500' : type === 'success' ? 'bg-green-500' : type === 'warning' ? 'bg-yellow-500' : 'bg-blue-500';
+                const el = document.createElement('div');
+                el.className = `notification ${bgColor} text-white py-2 px-4 rounded-lg shadow-lg opacity-0 transform translate-y-2`;
+                el.textContent = message;
+                notificationArea.appendChild(el);
+
+                setTimeout(() => {
+                    el.style.opacity = '1';
+                    el.style.transform = 'translateY(0)';
+                }, 10);
+
+                setTimeout(() => {
+                    el.style.opacity = '0';
+                    el.style.transform = 'translateY(2rem)';
+                    setTimeout(() => el.remove(), 500);
+                }, 4000);
+            }
+
+
+            // --- EVENT LISTENERS ---
+
+            toggleAuthModeLink.addEventListener('click', toggleAuthMode);
+            authForm.addEventListener('submit', handleAuthSubmit);
+            logoutButton.addEventListener('click', handleLogout);
+            searchInputEl.addEventListener('input', handleSearch);
+            topGainersButton.addEventListener('click', fetchTopGainers);
+            topLosersButton.addEventListener('click', fetchTopLosers);
+            canAffordButton.addEventListener('click', fetchCanAfford);
+            aiRecommendationsButton.addEventListener('click', fetchAIRecommendations);
+            filterContainer.addEventListener('click', handleFilterClick);
+
+            tabMarket.addEventListener('click', () => switchTab('market'));
+            tabTriggers.addEventListener('click', () => switchTab('triggers'));
+            executionTypeEl.addEventListener('change', updateTriggerFormVisibility);
+
+            createTriggerForm.addEventListener('submit', handleCreateTrigger);
+            activeTriggersListEl.addEventListener('click', e => {
+                const deleteButton = e.target.closest('.delete-trigger-btn');
+                if (deleteButton) {
+                    const triggerId = deleteButton.dataset.triggerId;
+                    handleDeleteTrigger(triggerId);
+                }
+            });
+
+            stockMarketListEl.addEventListener('click', e => {
+                // Click on trade button or anywhere else on the stock item
+                if (e.target.closest('.trade-btn')) { openTradeModal(e); } 
+                else { const stockItem = e.target.closest('.stock-item'); if (stockItem && stockItem.dataset.symbol) { openChartModal(stockItem.dataset.symbol); } }
+            });
+
+            portfolioListEl.addEventListener('click', e => {
+                if (e.target.closest('.trade-btn')) { openTradeModal(e); } 
+                else { const stockItem = e.target.closest('.stock-item'); if (stockItem && stockItem.dataset.symbol) { openChartModal(stockItem.dataset.symbol); } }
             });
             
+            cancelButtonEl.addEventListener('click', closeTradeModal);
+            confirmButtonEl.addEventListener('click', executeTrade);
+            sharesInputEl.addEventListener('input', updateTradeModalCalculations);
+            closeChartModalButton.addEventListener('click', closeChartModal);
+            chartModal.querySelector('.modal-backdrop').addEventListener('click', closeChartModal);
+
+            // --- INITIALIZATION ---
+            checkForSavedSession(); 
+            authButtonText.textContent = isLoginMode ? 'Iniciar Sesión' : 'Crear Cuenta';
+            updateTriggerFormVisibility();
         });
     </script>
 </body>
