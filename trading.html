@@ -127,6 +127,10 @@
             border-bottom-color: #3B82F6;
             font-weight: 600;
         }
+
+        /* Styles for History Modal */
+        .trade-row-buy { border-left: 4px solid #22C55E; }
+        .trade-row-sell { border-left: 4px solid #EF4444; }
     </style>
 </head>
 <body class="bg-gray-900 text-gray-100">
@@ -199,6 +203,11 @@
                             <!-- Daily P&L will be rendered here by JS -->
                         </div>
                     </div>
+                    
+                    <!-- NUEVO: Botón de Historial -->
+                    <button id="history-button" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg transition-colors">
+                        Historial
+                    </button>
 
                     <button id="logout-button" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg transition-colors">
                         Salir
@@ -402,6 +411,32 @@
         </div>
     </div>
 
+    <!-- NUEVO: History Modal -->
+    <div id="history-modal" class="fixed inset-0 z-50 items-center justify-center hidden">
+        <div class="modal-backdrop fixed inset-0"></div>
+        <div class="bg-gray-800 rounded-lg shadow-xl p-6 w-11/12 md:w-2/3 max-w-3xl z-10">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold text-white">Historial de Transacciones</h2>
+                <button id="close-history-modal-button" class="text-gray-400 hover:text-white text-xl font-bold">&times;</button>
+            </div>
+            
+            <div class="bg-gray-900 p-3 rounded-t-lg grid grid-cols-5 md:grid-cols-6 gap-2 font-semibold border-b border-gray-700 sticky top-0">
+                <div class="col-span-1">Acción</div>
+                <div class="col-span-1">Símbolo</div>
+                <div class="hidden md:block">Cantidad</div>
+                <div class="col-span-1">Precio</div>
+                <div class="col-span-1">Fuente</div>
+                <div class="col-span-1 text-right">Tiempo</div>
+            </div>
+
+            <div id="trade-history-list" class="space-y-2 max-h-[60vh] overflow-y-auto pr-2">
+                <!-- Trade history items will be rendered here -->
+                <p id="history-loading-status" class="text-gray-400 text-center py-4">Cargando historial...</p>
+            </div>
+        </div>
+    </div>
+
+
     <!-- Notification Area -->
     <div id="notification-area" class="fixed bottom-5 right-5 space-y-2 z-50"></div>
 
@@ -464,7 +499,7 @@
             // REMOVED: let currentChartInstance = null;
             const MARKET_DATA_UPDATE_INTERVAL_MS = 3000; // Update market prices every 3 seconds
             // MODIFICACIÓN SOLICITADA: Reducir el intervalo para una actualización más frecuente (anteriormente 10000ms)
-            const LEADERBOARD_UPDATE_INTERVAL_MS = 10000; // Update leaderboard every 3 seconds
+            const LEADERBOARD_UPDATE_INTERVAL_MS = 3000; // Update leaderboard every 3 seconds
             const TRIGGER_CHECK_INTERVAL_MS = 30000; // Check triggers every 30 seconds
 
             // --- DOM ELEMENTS ---
@@ -477,6 +512,7 @@
             const authSubmitButton = document.getElementById('auth-submit-button');
             const authButtonText = document.getElementById('auth-button-text');
             const logoutButton = document.getElementById('logout-button');
+            const historyButton = document.getElementById('history-button'); // NUEVO BOTÓN
             const cashBalanceEl = document.getElementById('cash-balance');
             const totalValueEl = document.getElementById('total-value');
             const dailyProfitLossEl = document.getElementById('daily-profit-loss');
@@ -494,6 +530,11 @@
             const tradingviewContainer = document.getElementById('tradingview-container'); // NEW container
             const chartLoader = document.getElementById('chart-loader');
             const chartErrorMessage = document.getElementById('chart-error-message');
+            
+            const historyModal = document.getElementById('history-modal'); // NUEVO MODAL
+            const closeHistoryModalButton = document.getElementById('close-history-modal-button'); // NUEVO BOTÓN
+            const tradeHistoryListEl = document.getElementById('trade-history-list'); // NUEVO ELEMENTO
+            const historyLoadingStatusEl = document.getElementById('history-loading-status'); // NUEVO ELEMENTO
             
             const dailySummaryTextEl = document.getElementById('daily-summary-text');
             const dailySummaryErrorEl = document.getElementById('daily-summary-error');
@@ -1655,6 +1696,79 @@
                 // Clear the iframe content to stop playback/loading
                 document.getElementById('tradingview-container').innerHTML = '';
             }
+            
+            // --- NUEVAS FUNCIONES DE HISTORIAL ---
+
+            async function openHistoryModal() {
+                historyLoadingStatusEl.textContent = 'Cargando historial...';
+                tradeHistoryListEl.innerHTML = ''; 
+                historyModal.classList.remove('hidden');
+                historyModal.classList.add('flex');
+                await fetchTradeHistory();
+            }
+
+            function closeHistoryModal() {
+                historyModal.classList.add('hidden');
+                historyModal.classList.remove('flex');
+            }
+
+            async function fetchTradeHistory() {
+                try {
+                    historyLoadingStatusEl.classList.remove('hidden');
+                    // Endpoint sin parámetros, simplemente devuelve todo el historial del usuario autenticado
+                    const data = await authedFetch('/tradehistory'); 
+                    
+                    const tradesArray = Object.values(data);
+                    
+                    // Ordenar por tiempo (más reciente primero)
+                    tradesArray.sort((a, b) => b.time - a.time);
+                    
+                    renderTradeHistory(tradesArray);
+
+                } catch (error) {
+                    historyLoadingStatusEl.textContent = `Error al cargar el historial: ${error.message}`;
+                    showNotification(`Error al cargar el historial: ${error.message}`, 'error');
+                }
+            }
+
+            function renderTradeHistory(trades) {
+                historyLoadingStatusEl.classList.add('hidden');
+                tradeHistoryListEl.innerHTML = '';
+
+                if (trades.length === 0) {
+                    tradeHistoryListEl.innerHTML = `<p class="text-gray-400 text-center py-4">No se encontraron transacciones en tu historial.</p>`;
+                    return;
+                }
+
+                trades.forEach(trade => {
+                    const actionText = trade.action === 'buy' ? 'COMPRA' : 'VENTA';
+                    const actionClass = trade.action === 'buy' ? 'text-green-400' : 'text-red-400';
+                    const rowClass = trade.action === 'buy' ? 'trade-row-buy' : 'trade-row-sell';
+                    const sourceText = trade.source === 'manual' ? 'Manual' : 'Programación';
+
+                    const date = new Date(trade.time);
+                    const timeString = date.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+                    const dateString = date.toLocaleDateString('es-ES', { year: 'numeric', month: 'short', day: 'numeric' });
+
+                    const el = document.createElement('div');
+                    el.className = `bg-gray-900 p-3 rounded-lg flex items-center shadow-md ${rowClass}`;
+                    
+                    el.innerHTML = `
+                        <div class="grid grid-cols-5 md:grid-cols-6 gap-2 w-full items-center text-sm">
+                            <div class="${actionClass} font-bold col-span-1">${actionText}</div>
+                            <div class="font-semibold col-span-1">${trade.symbol}</div>
+                            <div class="text-gray-300 hidden md:block">${trade.quantity}</div>
+                            <div class="text-white col-span-1">$${trade.price.toFixed(2)}</div>
+                            <div class="text-yellow-400 col-span-1">${sourceText}</div>
+                            <div class="text-gray-400 text-right col-span-1">
+                                <span class="block">${dateString}</span>
+                                <span class="block text-xs">${timeString}</span>
+                            </div>
+                        </div>
+                    `;
+                    tradeHistoryListEl.appendChild(el);
+                });
+            }
 
 
             // --- SEARCH & GAINERS/LOSERS ---
@@ -1856,6 +1970,10 @@
             toggleAuthModeLink.addEventListener('click', toggleAuthMode);
             authForm.addEventListener('submit', handleAuthSubmit);
             logoutButton.addEventListener('click', handleLogout);
+            historyButton.addEventListener('click', openHistoryModal); // NEW LISTENER
+            closeHistoryModalButton.addEventListener('click', closeHistoryModal); // NEW LISTENER
+            historyModal.querySelector('.modal-backdrop').addEventListener('click', closeHistoryModal); // NEW LISTENER
+            
             searchInputEl.addEventListener('input', handleSearch);
             topGainersButton.addEventListener('click', fetchTopGainers);
             topLosersButton.addEventListener('click', fetchTopLosers);
