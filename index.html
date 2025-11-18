@@ -416,6 +416,8 @@
             // --- NEW: Daily Signup Cooldown Config ---
             const SIGNUP_COOLDOWN_KEY = 'stock_simulator_last_signup';
             const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+            // --- NEW: Short Selling Multiplier ---
+            const SHORT_MULTIPLIER = 10;
             // --- END NEW CONFIG ---
 
             const defaultSymbols = ['AAPL', 'GOOGL', 'MSFT', 'TSLA', 'AMZN', 'NVDA', 'META', 'JPM', 'V', 'NFLX'];
@@ -821,7 +823,7 @@
                 timerDisplayEl.innerHTML = `<span class="text-orange-500">${remainingTimeHms}</span>`;
             }
             
-            // --- TRIGGER FUNCTIONS ---
+            // --- TRIGGER FUNCTIONS (Unchanged from last request) ---
 
             async function fetchMyTriggers() {
                 try {
@@ -1080,7 +1082,7 @@
             }
 
 
-            // --- DATA FETCHING & RENDERING ---
+            // --- DATA FETCHING & RENDERING (Unchanged in logic) ---
 
             async function fetchHistoricalDataAndInitialMarket() {
                 showLoader();
@@ -1089,7 +1091,6 @@
                 
                 if (symbolsForHistoryFetch.length > 0) {
                     try {
-                        // Fetch daily history for sparkline and P/L reference
                         const historyRes = await fetch(`${API_BASE_URL}/history?symbol=${symbolsForHistoryFetch.join(',')}&days=10`);
                         if (historyRes.ok) {
                             const data = await historyRes.json();
@@ -1212,7 +1213,7 @@
                             <p class="font-semibold text-lg">$${price.toFixed(2)}</p>
                             <p class="text-sm ${changeClass}">${changeSign}${change.toFixed(2)}$ (${changeSign}${changesPercentage.toFixed(2)}%)</p>
                         </div>
-                        <!-- MODIFICACIÓN: Botones más pequeños (py-1 px-2) -->
+                        <!-- Botones más pequeños (py-1 px-2) -->
                         <div class="flex flex-col md:flex-row justify-end ml-2 space-y-1 md:space-y-0 md:space-x-1">
                             <button data-symbol="${symbol}" data-type="buy" class="trade-btn text-xs font-bold bg-green-600 hover:bg-green-500 text-white py-1 px-2 rounded-md">COMPRAR</button>
                             <button data-symbol="${symbol}" data-type="sell" class="trade-btn text-xs font-bold bg-red-600 hover:bg-red-500 text-white py-1 px-2 rounded-md">VENDER</button>
@@ -1291,7 +1292,7 @@
                                 ${stockDailyProfitLossHtml}
                             </div>
                         </div>
-                        <!-- MODIFICACIÓN: Botones más pequeños (py-1 px-2) -->
+                        <!-- Botones más pequeños (py-1 px-2) -->
                         <div class="mt-2 grid grid-cols-2 gap-2">
                             <button data-symbol="${symbol}" data-type="buy" class="trade-btn w-full text-xs font-bold bg-green-600 hover:bg-green-500 text-white py-1 px-2 rounded-md">${quantity < 0 ? 'CUBRIR' : 'COMPRAR'}</button>
                             <button data-symbol="${symbol}" data-type="sell" class="trade-btn w-full text-xs font-bold bg-red-600 hover:bg-red-500 text-white py-1 px-2 rounded-md">${quantity > 0 ? 'VENDER' : 'V. CORTO'}</button>
@@ -1396,47 +1397,54 @@
             
             // --- TRADING & MODAL ---
 
-            // NEW: Function to check the short selling limit
-            function checkShortLimit(currentSymbol, tradeQuantity, tradePrice) {
-                const currentHolding = state.portfolio[currentSymbol] || 0;
-                const projectedHolding = currentHolding - tradeQuantity; // Sale always decreases holding
+            /**
+             * Checks if a proposed short sale would exceed the 10x cash collateral limit.
+             * This function assumes the trade type is 'sell' and checks if the final holding is negative.
+             */
+            function checkShortLimit(tradeSymbol, tradeQuantity, tradePrice, tradeType) {
+                const currentHolding = state.portfolio[tradeSymbol] || 0;
+                
+                // If type is 'sell', the final holding is currentHolding - tradeQuantity
+                const finalHolding = currentHolding - tradeQuantity;
 
-                // The transaction is only a shorting risk if the resulting position is negative.
-                if (projectedHolding >= 0) {
-                    return { isAllowed: true, message: '' }; // Closing long or selling from current holdings
+                // 1. Check if the trade results in a new or increased short position
+                if (finalHolding >= 0) {
+                    return { isAllowed: true, message: '' };
                 }
 
-                // 1. Calculate the projected short exposure for the current symbol
-                // This is the absolute new negative amount * price
-                const projectedSymbolShortExposure = Math.abs(projectedHolding) * tradePrice;
+                // --- Calculation for potential/increased Short Position ---
 
-                // 2. Calculate the existing short exposure from other symbols
-                let existingOtherShortExposure = 0;
+                // 2. Calculate the total short exposure *after* the proposed trade.
+                let totalProjectedShortExposure = 0;
+
+                // A) Add the projected short exposure for the current symbol (it's guaranteed to be negative here)
+                totalProjectedShortExposure += Math.abs(finalHolding) * tradePrice;
+
+                // B) Add existing short exposure from other symbols
                 for (const symbol in state.portfolio) {
-                    if (symbol !== currentSymbol) {
-                        const quantity = state.portfolio[symbol];
-                        if (quantity < 0) {
-                            const stock = state.marketStocks.find(s => s.symbol === symbol);
-                            if (stock) {
-                                // Add the absolute value of the short position
-                                existingOtherShortExposure += Math.abs(quantity) * stock.price;
-                            }
+                    const quantity = state.portfolio[symbol];
+                    // Check if it's an existing short position and not the current symbol (to avoid double counting)
+                    if (quantity < 0 && symbol !== tradeSymbol) { 
+                        const stock = state.marketStocks.find(s => s.symbol === symbol);
+                        if (stock) {
+                            totalProjectedShortExposure += Math.abs(quantity) * stock.price;
+                        } else {
+                             // Log an error/warning if data for an existing short position is missing
+                             console.warn(`Advertencia: Precio de ${symbol} no encontrado. Ignorando en el cálculo del corto total.`);
                         }
                     }
                 }
 
-                // 3. Total projected short exposure (absolute value)
-                const totalProjectedShortExposure = projectedSymbolShortExposure + existingOtherShortExposure;
+                // 3. Define the maximum allowed short exposure (10x cash)
+                const multiplier = SHORT_MULTIPLIER;
+                const maxAllowedShortExposure = state.cash * multiplier;
 
-                // 4. Check against available cash (the collateral)
-                const maxAllowedShortExposure = state.cash;
-                
                 if (totalProjectedShortExposure <= maxAllowedShortExposure) {
                     return { isAllowed: true, message: '' };
                 } else {
                     return { 
                         isAllowed: false, 
-                        message: `Límite de venta en corto excedido. El valor total de tus posiciones en corto proyectadas ($${totalProjectedShortExposure.toFixed(2)}) no puede superar tu efectivo disponible ($${maxAllowedShortExposure.toFixed(2)}).`
+                        message: `Límite de Venta en Corto excedido. El valor total de tus posiciones en corto proyectadas ($${totalProjectedShortExposure.toFixed(2)}) excede tu límite de ${multiplier}x efectivo ($${maxAllowedShortExposure.toFixed(2)}).`
                     };
                 }
             }
@@ -1467,6 +1475,7 @@
                 sharesInputEl.value = '1';
                 
                 if (type === 'buy') {
+                    // Maximum shares based on cash available
                     sharesInputEl.max = Math.floor(state.cash / stock.price);
                 } else {
                     sharesInputEl.removeAttribute('max');
@@ -1544,7 +1553,7 @@
                     }
                 } else if (type === 'sell') {
                     // NEW: Short selling limit check
-                    const check = checkShortLimit(symbol, quantity, stock.price);
+                    const check = checkShortLimit(symbol, quantity, stock.price, type);
                     if (!check.isAllowed) {
                         showNotification(check.message, 'error');
                         setButtonLoading(confirmButtonEl, originalConfirmText, false);
@@ -1605,7 +1614,7 @@
             }
 
 
-            // --- SEARCH & GAINERS/LOSERS ---
+            // --- SEARCH & GAINERS/LOSERS (Unchanged in logic) ---
             let debounceTimeout;
             async function handleSearch(e) {
                 const query = e.target.value.trim();
