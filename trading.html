@@ -449,6 +449,9 @@
                 activeFilter: 'all', 
                 triggers: {}, // { "triggerId": { ... } } - OJO: Solo los triggers del usuario actual
                 isCheckingTriggers: false, // NEW: Flag to prevent concurrent trigger checks
+                // NUEVOS CAMPOS PARA EL CÁLCULO DE MARGEN
+                totalPortfolioValue: 0, 
+                currentShortExposure: 0, 
             };
             
             let isLoginMode = true; 
@@ -663,7 +666,9 @@
                 marketDataInterval = null; leaderboardInterval = null; triggerCheckInterval = null; marketTimerInterval = null;
                 // REMOVED: Chart destroy logic
                 localStorage.removeItem('stock_simulator_username'); localStorage.removeItem('stock_simulator_password');
-                state.authToken = null; state.username = null; state.portfolio = {}; state.cash = 0; // REMOVED: Chart caches from state
+                state.authToken = null; state.username = null; state.portfolio = {}; state.cash = 0; 
+                state.totalPortfolioValue = 0; // RESET MARGIN STATE
+                state.currentShortExposure = 0; // RESET MARGIN STATE
                 state.activeFilter = 'all'; state.triggers = {}; state.allUserTriggers = {};
                 mainAppView.style.opacity = '0';
                 setTimeout(() => { mainAppView.classList.add('hidden'); authView.classList.remove('hidden'); authView.style.opacity = '1'; }, 500);
@@ -733,16 +738,28 @@
             
             function updateTotalValue() {
                 let portfolioValue = 0;
+                let currentShortExposure = 0; // NUEVO: Para calcular la exposición corta total (deuda en corto)
+
                 for (const symbol in state.portfolio) {
                     const quantity = state.portfolio[symbol];
                     const stockData = state.marketStocks.find(s => s.symbol === symbol);
                     if (stockData) {
+                        const marketValue = stockData.price * quantity;
                         // MODIFICACIÓN: La valoración es (precio * cantidad)
-                        portfolioValue += stockData.price * quantity;
+                        portfolioValue += marketValue;
+                        
+                        // Si la posición es corta, sumar su valor absoluto a la exposición corta
+                        if (quantity < 0) {
+                            currentShortExposure += Math.abs(marketValue);
+                        }
                     }
                 }
                 const totalValue = state.cash + portfolioValue;
                 totalValueEl.textContent = `$${totalValue.toFixed(2)}`;
+                
+                // NUEVO: Guardar el valor total del portafolio y la exposición corta en el estado para el chequeo de margen
+                state.totalPortfolioValue = totalValue;
+                state.currentShortExposure = currentShortExposure; 
                 
                 // SOLICITADO: Actualizar el título de la página
                 document.title = `$${totalValue.toFixed(2)} | Tradeator`;
@@ -1535,11 +1552,51 @@
                     return;
                 }
 
-                if (type === 'buy' && (quantity * stock.price > state.cash)) {
-                    showNotification('Fondos insuficientes para esta compra.', 'error');
-                    return;
-                }
+                const currentHolding = state.portfolio[symbol] || 0;
+                const sharePrice = stock.price;
+                const tradeValue = quantity * sharePrice;
+                const shortDebtLimit = 10 * state.totalPortfolioValue; // Límite de Deuda en Corto: 10x TPV (Equity)
+
+                // CASO 1: Compra (Long Buy o Short Cover)
+                if (type === 'buy') {
+                    // Si el trade es una compra y el costo es mayor al efectivo disponible.
+                    if (tradeValue > state.cash) {
+                        showNotification('Fondos insuficientes para esta compra.', 'error');
+                        return;
+                    }
+                } 
                 
+                // CASO 2: Venta (Long Sell o Short Sell/Increase Short)
+                else if (type === 'sell') {
+                    const newHolding = currentHolding - quantity;
+                    
+                    // Si el nuevo holding es negativo (posicion corta o aumento de corto)
+                    if (newHolding < 0) {
+                        // Calcular el valor de la nueva exposición corta TOTAL (incluyendo otras acciones)
+                        let newTotalShortExposure = 0;
+                        
+                        // 1. Sumar la exposición de otras acciones cortas (excluyendo la actual)
+                        for (const s in state.portfolio) {
+                            if (s !== symbol && state.portfolio[s] < 0) {
+                                const sData = state.marketStocks.find(st => st.symbol === s);
+                                if (sData) {
+                                    newTotalShortExposure += Math.abs(state.portfolio[s] * sData.price);
+                                }
+                            }
+                        }
+                        
+                        // 2. Añadir la nueva exposición de la acción actual
+                        newTotalShortExposure += Math.abs(newHolding * sharePrice);
+                        
+                        // Chequeo de Límite de Deuda en Corto (10x TPV)
+                        if (newTotalShortExposure > shortDebtLimit) {
+                            showNotification(`Límite de Deuda en Corto excedido. Máximo permitido: $${shortDebtLimit.toFixed(2)}. Su nueva deuda sería de $${newTotalShortExposure.toFixed(2)}.`, 'error');
+                            return; // Bloquear la operación
+                        }
+                    }
+                    // Si la venta es de acciones que tienes (Long Sell), no aplica límite de margen.
+                }
+
                 const originalConfirmText = confirmButtonEl.textContent;
                 setButtonLoading(confirmButtonEl, originalConfirmText, true);
 
